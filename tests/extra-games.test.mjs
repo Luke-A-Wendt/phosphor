@@ -44,9 +44,51 @@ test('Tanks impacts damage tanks, excavate terrain, and award a victory',()=>see
  tanks.shot={side:0};tanks.impact(enemy.x,enemy.y-3,1);assert.equal(enemy.hp,0);assert.equal(tanks.status,'won');assert.equal(tanks.score,250);
 }));
 
-test('Tanks computer can aim at the opponent using its actual ballistics',()=>seeded(()=>{
- const tanks=create('tanks');start(tanks);tanks.wind=0;const aim=tanks.chooseAim();const impact=tanks.predict(aim.angle,aim.power);assert.ok(!impact.miss);assert.ok(Math.abs(impact.x-tanks.tanks[0].x)<35,'CPU shot approaches player with deliberate error');
+test('Tanks opening shots need calibration while actual impacts improve later aim',()=>seeded(()=>{
+ const scenarios=160,errors=[0,0,0],directHits=[0,0,0];
+ for(let scenario=0;scenario<scenarios;scenario++){
+  const tanks=create('tanks');start(tanks);
+  for(let turn=0;turn<3;turn++){
+   // Keep each duel alive for comparison, retaining real crater changes and
+   // changing wind as normal rounds do. No trajectory prediction trains the AI.
+   tanks.tanks.forEach(tank=>tank.hp=1000);tanks.status='playing';tanks.wait=0;tanks.blast=null;
+   if(turn)tanks.wind=-3+Math.random()*6;
+   const aim=tanks.chooseAim();assert.ok(Number.isFinite(aim.angle)&&Number.isFinite(aim.power));
+   assert.ok(aim.angle>=10&&aim.angle<=80&&aim.power>=15&&aim.power<=100);
+   assert.ok(tanks.fire(1,aim.angle,aim.power));
+   for(let frame=0;frame<1400&&tanks.shot;frame++)tanks.update(1/120,input());
+   assert.equal(tanks.shot,null);assert.ok(tanks.aiObservation,'only a resolved real shell supplies calibration');
+   errors[turn]+=Math.abs(tanks.aiObservation.x-tanks.tanks[0].x);
+   if(1000-tanks.tanks[0].hp===80)directHits[turn]++;
+  }
+ }
+ assert.ok(directHits[0]>0,'an opening shot can still hit by chance');
+ assert.ok(directHits[0]<scenarios*.35,'most opening shots need calibration');
+ assert.ok(directHits[1]>directHits[0]*1.4,'feedback makes the second shot more competitive');
+ assert.ok(directHits[2]>directHits[0]*1.7,'later calibrated shots can win the duel');
+ assert.ok(errors[1]<errors[0]*.65&&errors[2]<errors[0]*.5,'observed impacts improve range despite changing wind and terrain');
 }));
+
+test('Tanks calibration ignores previews and player shots, records offscreen misses, and resets each duel',()=>seeded(()=>{
+ const tanks=create('tanks');start(tanks);
+ for(let n=0;n<4;n++)tanks.chooseAim();
+ assert.equal(tanks.aiObservation,null);assert.equal(tanks.aiShots,0);
+ tanks.shot={side:0};tanks.impact(128,150);assert.equal(tanks.aiObservation,null,'the player cannot calibrate the opponent');
+ tanks.wait=0;tanks.blast=null;const aim=tanks.chooseAim();tanks.fire(1,aim.angle,aim.power);
+ assert.equal(tanks.aiShots,1);assert.equal(tanks.fire(1,aim.angle,aim.power),false);assert.equal(tanks.aiShots,1,'blocked fire does not count');
+ tanks.shot.x=255;tanks.update(1/120,input());
+ assert.equal(tanks.shot,null);assert.equal(tanks.wait,.5);assert.ok(tanks.aiObservation.x>254,'a shell leaving the screen still teaches range');
+ const corrected=tanks.chooseAim();assert.ok(Number.isFinite(corrected.angle)&&Number.isFinite(corrected.power));
+ tanks.restart();assert.equal(tanks.aiShots,0);assert.equal(tanks.aiObservation,null);assert.equal(tanks.aiAim,null);
+}));
+
+test('Lander and Tanks use their one-word names in the HUD and ready screen',()=>{
+ for(const [id,name] of [['lander','LANDER'],['tanks','TANKS']]){
+  const labels=[],game=createExtraGame(id,(_ctx,label)=>labels.push(String(label)));
+  game.render(raster);assert.ok(labels.filter(label=>label===name).length>=2);
+  assert.ok(!labels.some(label=>/LUNAR LANDER|SCORCHED TANKS/.test(label)));
+ }
+});
 
 test('Lander rewards a gentle level landing and advances to a narrower pad',()=>{
  const lander=create('lander');start(lander);const width=lander.pad.right-lander.pad.left;
@@ -69,6 +111,29 @@ test('Lander thrust consumes fuel, gravity resumes empty, and tilt stays bounded
  lander.ship.fuel=0;lander.ship.vy=0;lander.update(.1,input(['Space']));assert.ok(lander.ship.vy>0);assert.equal(lander.ship.fuel,0);
  lander.ship.y=60;lander.update(1,input(['ArrowRight','Space']));assert.equal(lander.ship.angle,1.15);
 });
+
+test('Lander exposes thrust only during a burn and ends it on release, fuel loss, landing or crash',()=>{
+ const lander=create('lander'),events=[],i=input(['Space']);i.sound=event=>events.push(event);start(lander);
+ lander.update(.02,i);assert.equal(lander.thrust,true);
+ lander.update(.02,input());assert.equal(lander.thrust,false,'release cuts the audio drive signal');
+ lander.ship.fuel=0;lander.update(.02,i);assert.equal(lander.thrust,false,'an empty tank produces no engine signal');
+ for(const [speed,phase,event] of [[5,'landed','score'],[30,'crashed','lose']]){
+  lander.resetShip();Object.assign(lander.ship,{x:(lander.pad.left+lander.pad.right)/2,y:lander.pad.y-7-.01,vx:0,vy:speed,angle:0});
+  events.length=0;lander.update(.02,i);
+  assert.equal(lander.phase,phase);assert.equal(lander.thrust,false,'touchdown cuts the audio drive even while thrust remains held');assert.deepEqual(events,[event]);
+  lander.update(.1,i);assert.equal(lander.thrust,false);assert.deepEqual(events,[event],'terminal feedback is emitted once');
+ }
+});
+
+test('Tanks emits one firing event per shell and exposes one stable impact for the audio observer',()=>seeded(()=>{
+ const tanks=create('tanks'),events=[],i=input([],['Space']);i.sound=event=>events.push(event);start(tanks);
+ tanks.angle=20;tanks.power=48;tanks.wind=0;tanks.update(1/120,i);
+ assert.deepEqual(events,['shoot']);assert.ok(tanks.shot);
+ for(let frame=0;frame<1000&&!tanks.blast;frame++)tanks.update(1/120,i);
+ assert.ok(tanks.blast,'a short shell strikes the terrain');assert.deepEqual(events,['shoot'],'repeated action cannot fire over an active shell');
+ const blast=tanks.blast;tanks.update(.1,input());assert.equal(tanks.blast,blast,'impact identity remains stable to suppress repeated sound');
+ tanks.update(.6,input());assert.equal(tanks.blast,null,'impact expires after its visual tail');
+}));
 
 test('new game simulations render finite monochrome geometry inside the raster',()=>seeded(()=>{
  for(const info of EXTRA_GAME_INFO){const game=create(info.id);game.render(raster);start(game);for(let frame=0;frame<2400;frame++){

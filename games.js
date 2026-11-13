@@ -1,11 +1,11 @@
 import {EXTRA_GAME_INFO,createExtraGame} from './extra-games.js';
 /* Original, minimal homages. Every pixel is drawn into a 256 × 192 monochrome raster. */
 export const GAME_INFO = [
-  { id:'tetris', name:'Tetris', description:'Ten columns. Seven shapes. Keep the stack alive.', controls:'← → MOVE · ↑ ROTATE · ↓ SOFT DROP · SPACE DROP' },
-  { id:'pong', name:'Pong', description:'One paddle. One opponent. First to seven.', controls:'↑ ↓ MOVE · SPACE SERVE · FIRST TO 7' },
-  { id:'breakout', name:'Breakout', description:'Clear the wall. Keep the light in play.', controls:'← → MOVE · SPACE LAUNCH' },
-  { id:'asteroids', name:'Asteroids', description:'A small ship in a field of drifting rock.', controls:'← → TURN · ↑ THRUST · SPACE FIRE' },
-  { id:'invaders', name:'Space Invaders', description:'Hold the line against the descending formation.', controls:'← → MOVE · SPACE FIRE' },
+  { id:'tetris', name:'Tetris', description:'Ten columns. Seven shapes. Keep the stack alive.', controls:'← → MOVE · ↑ ROTATE · ↓ SOFT DROP · ENTER DROP' },
+  { id:'pong', name:'Pong', description:'One paddle. One opponent. First to seven.', controls:'↑ ↓ MOVE · ENTER SERVE · FIRST TO 7' },
+  { id:'breakout', name:'Breakout', description:'Clear the wall. Keep the light in play.', controls:'← → MOVE · ENTER LAUNCH' },
+  { id:'asteroids', name:'Asteroids', description:'A small ship in a field of drifting rock.', controls:'← → TURN · ↑ THRUST · ENTER FIRE' },
+  { id:'invaders', name:'Invaders', description:'Hold the line against the descending formation.', controls:'← → MOVE · ENTER FIRE' },
   ...EXTRA_GAME_INFO
 ];
 
@@ -29,7 +29,7 @@ export function pixelText(c,text,x,y,scale=1,intensity=1,align='left'){
 }
 function clear(c){c.fillStyle='#000';c.fillRect(0,0,256,192);}
 function hud(c,left,right){pixelText(c,left,16,10,1,.85);pixelText(c,right,240,10,1,.85,'right');rect(c,16,19,224,1,.16);}
-function overlay(c,title,sub='PRESS SPACE',extra=''){
+function overlay(c,title,sub='PRESS ENTER',extra=''){
  rect(c,48,72,160,45,0);rect(c,48,72,160,1,.35);rect(c,48,116,160,1,.35);
  pixelText(c,title,128,82,1,1,'center');pixelText(c,sub,128,96,1,.7,'center');if(extra)pixelText(c,extra,128,107,1,.4,'center');
 }
@@ -38,7 +38,7 @@ class Base {
  constructor(id){this.id=id;this.status='ready';this._score=0;this.time=0;}
  get score(){return this._score;}
  startGate(dt,i){this.time+=dt;if(this.status==='ready'||this.status==='over'||this.status==='won'){if(hit(i,'Space')){if(this.status!=='ready')this.restart();this.status='playing';this.onStart?.();i.sound?.('start');}return true;}return false;}
- terminalOverlay(c,title){if(this.status==='ready')overlay(c,title,'PRESS SPACE','ESC FOR MENU');else if(this.status==='over')overlay(c,'GAME OVER','SPACE TO RESTART');else if(this.status==='won')overlay(c,'YOU WIN','SPACE TO RESTART');}
+ terminalOverlay(c,title){if(this.status==='ready')overlay(c,title,'PRESS ENTER','ESC FOR MENU');else if(this.status==='over')overlay(c,'GAME OVER','ENTER TO RESTART');else if(this.status==='won')overlay(c,'YOU WIN','ENTER TO RESTART');}
 }
 
 const SHAPES=[[[1,1,1,1]],[[1,1],[1,1]],[[0,1,0],[1,1,1]],[[1,0,0],[1,1,1]],[[0,0,1],[1,1,1]],[[0,1,1],[1,1,0]],[[1,1,0],[0,1,1]]];
@@ -79,7 +79,7 @@ class Pong extends Base{
  if(b.vx<0&&b.x<=19&&b.x>=11&&Math.abs(b.y-this.py)<17){const angle=clamp((b.y-this.py)/16,-1,1)*.9;const speed=Math.min(145,Math.hypot(b.vx,b.vy)+4);b.x=19;b.vx=Math.cos(angle)*speed;b.vy=Math.sin(angle)*speed+this.pv*.12;i.sound?.('hit');}
  if(b.vx>0&&b.x>=237&&b.x<=245&&Math.abs(b.y-this.ay)<17){const angle=clamp((b.y-this.ay)/16,-1,1)*.9;const speed=Math.min(145,Math.hypot(b.vx,b.vy)+4);b.x=237;b.vx=-Math.cos(angle)*speed;b.vy=Math.sin(angle)*speed;i.sound?.('hit');}
  if(b.x<0||b.x>256){if(b.x>256){this._score++;this.serveDir=-1;}else{this.enemyScore++;this.serveDir=1;}this.waiting=true;this.ball={x:128,y:104,vx:0,vy:0};i.sound?.('score');if(this._score>=7)this.status='won';else if(this.enemyScore>=7)this.status='over';break;}}}
- render(c){clear(c);hud(c,'PONG','FIRST TO 7');for(let y=26;y<180;y+=8)rect(c,127,y,1,3,.18);pixelText(c,this._score,100,31,2,.8,'center');pixelText(c,this.enemyScore,156,31,2,.8,'center');rect(c,15,this.py-15,3,30,.95);rect(c,238,this.ay-15,3,30,.7);rect(c,this.ball.x-1,this.ball.y-1,3,3,1);if(this.waiting&&this.status==='playing')pixelText(c,'SPACE TO SERVE',128,125,1,.6,'center');this.terminalOverlay(c,'PONG');}
+ render(c){clear(c);hud(c,'PONG','FIRST TO 7');for(let y=26;y<180;y+=8)rect(c,127,y,1,3,.18);pixelText(c,this._score,100,31,2,.8,'center');pixelText(c,this.enemyScore,156,31,2,.8,'center');rect(c,15,this.py-15,3,30,.95);rect(c,238,this.ay-15,3,30,.7);rect(c,this.ball.x-1,this.ball.y-1,3,3,1);if(this.waiting&&this.status==='playing')pixelText(c,'ENTER TO SERVE',128,125,1,.6,'center');this.terminalOverlay(c,'PONG');}
 }
 
 class Breakout extends Base{
@@ -89,14 +89,14 @@ class Breakout extends Base{
  resetBall(){this.waiting=true;this.ball={x:this.px,y:170,vx:0,vy:0};}
  onStart(){this.launch();}
  launch(){this.waiting=false;const speed=62+Math.min(28,(this.level-1)*6);this.ball.vx=speed*.38*(Math.random()<.5?-1:1);this.ball.vy=-speed*.925;}
- update(dt,i){if(this.startGate(dt,i))return;this.px=clamp(this.px+(Number(held(i,'ArrowRight','KeyD'))-Number(held(i,'ArrowLeft','KeyA')))*148*dt,32,224);
+ update(dt,i){if(this.startGate(dt,i))return;this.px=clamp(this.px+(Number(held(i,'ArrowRight','KeyD'))-Number(held(i,'ArrowLeft','KeyA')))*148*dt,27,229);
  if(this.waiting){this.ball.x=this.px;if(hit(i,'Space'))this.launch();return;}const b=this.ball;
  for(let s=0;s<4;s++){const oldX=b.x,oldY=b.y;b.x+=b.vx*dt/4;b.y+=b.vy*dt/4;if(b.x<13){b.x=13;b.vx=Math.abs(b.vx);i.sound?.('tick');}if(b.x>243){b.x=243;b.vx=-Math.abs(b.vx);i.sound?.('tick');}if(b.y<25){b.y=25;b.vy=Math.abs(b.vy);i.sound?.('tick');}
- if(b.vy>0&&oldY<=173&&b.y>=173&&Math.abs(b.x-this.px)<22){const angle=clamp((b.x-this.px)/21,-1,1)*1.08;const speed=Math.min(112,Math.hypot(b.vx,b.vy)+1);b.y=172;b.vx=Math.sin(angle)*speed;b.vy=-Math.cos(angle)*speed;i.sound?.('hit');}
+ if(b.vy>0&&oldY<=173&&b.y>=173&&Math.abs(b.x-this.px)<17){const angle=clamp((b.x-this.px)/16,-1,1)*1.08;const speed=Math.min(112,Math.hypot(b.vx,b.vy)+1);b.y=172;b.vx=Math.sin(angle)*speed;b.vy=-Math.cos(angle)*speed;i.sound?.('hit');}
  for(const brick of this.bricks){if(!brick.alive)continue;if(b.x+1.5>=brick.x&&b.x-1.5<=brick.x+brick.w&&b.y+1.5>=brick.y&&b.y-1.5<=brick.y+brick.h){brick.alive=false;this._score+=(5-brick.row)*10;if(oldY+1.5<=brick.y||oldY-1.5>=brick.y+brick.h)b.vy*=-1;else b.vx*=-1;b.x=oldX;b.y=oldY;i.sound?.('hit');break;}}
  if(b.y>195){this.lives--;i.sound?.('lose');if(this.lives<=0)this.status='over';else this.resetBall();break;}}
  if(!this.bricks.some(b=>b.alive)){this.level++;this.makeBricks();this.resetBall();i.sound?.('clear');}}
- render(c){clear(c);hud(c,'BREAKOUT',String(this._score).padStart(5,'0'));rect(c,10,24,1,157,.12);rect(c,245,24,1,157,.12);this.bricks.forEach(b=>{if(b.alive)rect(c,b.x,b.y,b.w,b.h,.95-b.row*.12);});rect(c,this.px-20,176,40,3,.95);rect(c,this.ball.x-1,this.ball.y-1,3,3,1);pixelText(c,'L'+this.level,16,183,1,.5);pixelText(c,'LIVES '+this.lives,240,183,1,.5,'right');if(this.waiting&&this.status==='playing')pixelText(c,'SPACE TO LAUNCH',128,119,1,.65,'center');this.terminalOverlay(c,'BREAKOUT');}
+ render(c){clear(c);hud(c,'BREAKOUT',String(this._score).padStart(5,'0'));rect(c,10,24,1,157,.12);rect(c,245,24,1,157,.12);this.bricks.forEach(b=>{if(b.alive)rect(c,b.x,b.y,b.w,b.h,.95-b.row*.12);});rect(c,this.px-15,176,30,3,.95);rect(c,this.ball.x-1,this.ball.y-1,3,3,1);pixelText(c,'L'+this.level,16,183,1,.5);pixelText(c,'LIVES '+this.lives,240,183,1,.5,'right');if(this.waiting&&this.status==='playing')pixelText(c,'ENTER TO LAUNCH',128,119,1,.65,'center');this.terminalOverlay(c,'BREAKOUT');}
 }
 
 const wrap=(v,low,high)=>low+((v-low)%(high-low)+(high-low))%(high-low);
@@ -124,7 +124,7 @@ class Invaders extends Base{
  restart(){this.status='ready';this._score=0;this.lives=3;this.wave=1;this.px=128;this.bullets=[];this.enemyShots=[];this.particles=[];this.cooldown=0;this.inv=0;this.makeWave();}
  makeWave(){this.aliens=[];for(let row=0;row<4;row++)for(let col=0;col<11;col++)this.aliens.push({x:25+col*19,y:32+row*13,row,col,alive:true});this.dir=1;this.stepClock=0;this.fireClock=1.1;this.enemyShots=[];this.bullets=[];this.shelters=[];for(let s=0;s<4;s++)for(let y=0;y<10;y++)for(let x=0;x<20;x++){if((y<2&&(x<3-y||x>16+y))||(y>=6&&x>=7&&x<=12))continue;this.shelters.push({x:34+s*56+x,y:145+y});}this.ufo={x:-20,active:false};this.ufoClock=rnd(12,19);}
  update(dt,i){if(this.startGate(dt,i))return;this.inv-=dt;this.px=clamp(this.px+(Number(held(i,'ArrowRight','KeyD'))-Number(held(i,'ArrowLeft','KeyA')))*92*dt,16,240);this.cooldown-=dt;if(held(i,'Space')&&this.cooldown<=0&&this.bullets.length<2){this.cooldown=.3;this.bullets.push({x:this.px,y:171,dead:false});i.sound?.('shoot');}
- const alive=this.aliens.filter(a=>a.alive);this.stepClock+=dt;const stepInterval=Math.max(.065,.44*(alive.length/44)/Math.sqrt(this.wave));if(this.stepClock>=stepInterval){this.stepClock-=stepInterval;const edge=alive.some(a=>a.x+this.dir*2<14||a.x+this.dir*2>236);if(edge){this.dir*=-1;alive.forEach(a=>a.y+=5);}else alive.forEach(a=>a.x+=this.dir*2);if(alive.some(a=>a.y>=163)){this.status='over';i.sound?.('lose');}}
+ const alive=this.aliens.filter(a=>a.alive);this.stepClock+=dt;const stepInterval=Math.max(.065,.44*(alive.length/44)/Math.sqrt(this.wave));if(alive.length&&this.stepClock>=stepInterval){this.stepClock-=stepInterval;const edge=alive.some(a=>a.x+this.dir*2<14||a.x+this.dir*2>236);if(edge){this.dir*=-1;alive.forEach(a=>a.y+=5);}else alive.forEach(a=>a.x+=this.dir*2);if(alive.some(a=>a.y>=163)){this.status='over';i.sound?.('lose');}else i.sound?.('march');}
  this.fireClock-=dt;if(this.fireClock<=0&&alive.length){this.fireClock=rnd(.4,1.05)/Math.min(2,1+this.wave*.15);const cols=[...new Set(alive.map(a=>a.col))];const col=cols[Math.floor(Math.random()*cols.length)];const shooter=alive.filter(a=>a.col===col).sort((a,b)=>b.y-a.y)[0];this.enemyShots.push({x:shooter.x+3,y:shooter.y+6});}
  this.ufoClock-=dt;if(!this.ufo.active&&this.ufoClock<=0){this.ufo={x:-14,active:true};this.ufoClock=rnd(13,20);}if(this.ufo.active){this.ufo.x+=32*dt;if(this.ufo.x>268)this.ufo.active=false;}
  const erode=(x,y)=>{const touched=this.shelters.some(p=>Math.abs(p.x-x)<2&&Math.abs(p.y-y)<3);if(touched)this.shelters=this.shelters.filter(p=>Math.hypot(p.x-x,p.y-y)>3.1);return touched;};
@@ -135,7 +135,7 @@ class Invaders extends Base{
  // Invaders erase cover as they march through it.
  this.shelters=this.shelters.filter(p=>!alive.some(a=>a.alive&&p.x>=a.x&&p.x<=a.x+6&&p.y>=a.y&&p.y<=a.y+6));
  if(!this.aliens.some(a=>a.alive)&&this.status==='playing'){this.wave++;this.makeWave();this.inv=1;i.sound?.('clear');}}
- render(c){clear(c);hud(c,'INVADERS',String(this._score).padStart(6,'0'));this.aliens.forEach(a=>{if(a.alive){const rows=ALIENS[a.row%3];sprite(c,Math.floor(this.time*3)%2?rows:rows.map((r,j)=>j===5?(r==='010010'?'100001':'010010'):r),a.x,a.y,1,.95-a.row*.12);}});this.shelters.forEach(p=>rect(c,p.x,p.y,1,1,.5));this.bullets.forEach(b=>rect(c,b.x,b.y,1,4,1));this.enemyShots.forEach(b=>{rect(c,b.x,b.y,1,3,.8);rect(c,b.x+(Math.floor(this.time*16)%2?1:-1),b.y+2,1,2,.65);});if(this.ufo.active)sprite(c,['0001111000','0111111110','1111111111','0101001010'],this.ufo.x,19,1,.8);this.particles.forEach(p=>{line(c,p.x-4,p.y-4,p.x+4,p.y+4,p.life*4);line(c,p.x+4,p.y-4,p.x-4,p.y+4,p.life*4);});if(this.inv<=0||Math.floor(this.time*9)%2===0)sprite(c,['00000100000','00001110000','01111111110','11111111111','11111111111','11111111111'],this.px-5,172,1,1);rect(c,12,181,232,1,.2);pixelText(c,'WAVE '+this.wave,16,183,1,.45);pixelText(c,'LIVES '+this.lives,240,183,1,.45,'right');this.terminalOverlay(c,'SPACE INVADERS');}
+ render(c){clear(c);hud(c,'INVADERS',String(this._score).padStart(6,'0'));this.aliens.forEach(a=>{if(a.alive){const rows=ALIENS[a.row%3];sprite(c,Math.floor(this.time*3)%2?rows:rows.map((r,j)=>j===5?(r==='010010'?'100001':'010010'):r),a.x,a.y,1,.95-a.row*.12);}});this.shelters.forEach(p=>rect(c,p.x,p.y,1,1,.5));this.bullets.forEach(b=>rect(c,b.x,b.y,1,4,1));this.enemyShots.forEach(b=>{rect(c,b.x,b.y,1,3,.8);rect(c,b.x+(Math.floor(this.time*16)%2?1:-1),b.y+2,1,2,.65);});if(this.ufo.active)sprite(c,['0001111000','0111111110','1111111111','0101001010'],this.ufo.x,19,1,.8);this.particles.forEach(p=>{line(c,p.x-4,p.y-4,p.x+4,p.y+4,p.life*4);line(c,p.x+4,p.y-4,p.x-4,p.y+4,p.life*4);});if(this.inv<=0||Math.floor(this.time*9)%2===0)sprite(c,['00000100000','00001110000','01111111110','11111111111','11111111111','11111111111'],this.px-5,172,1,1);rect(c,12,181,232,1,.2);pixelText(c,'WAVE '+this.wave,16,183,1,.45);pixelText(c,'LIVES '+this.lives,240,183,1,.45,'right');this.terminalOverlay(c,'INVADERS');}
 }
 
 export function createGame(id){switch(id){case 'tetris':return new Tetris();case 'pong':return new Pong();case 'breakout':return new Breakout();case 'asteroids':return new Asteroids();case 'invaders':case 'space-invaders':return new Invaders();default:return createExtraGame(id,pixelText);}}

@@ -7,7 +7,8 @@ const sorted=s=>[...s].sort();
 test('only movement keys and the single action are mapped',()=>{
   for(const [letter,direction] of [['KeyW','ArrowUp'],['KeyA','ArrowLeft'],['KeyS','ArrowDown'],['KeyD','ArrowRight']])assert.equal(movementCodes[letter],direction);
   assert.equal(movementCodes.Space,'Space');
-  for(const removed of ['Enter','KeyP','KeyR','KeyF','KeyZ','KeyX'])assert.equal(movementCodes[removed],undefined);
+  assert.equal(movementCodes.Enter,'Space');assert.equal(movementCodes.NumpadEnter,'Space');
+  for(const removed of ['KeyP','KeyR','KeyF','KeyZ','KeyX'])assert.equal(movementCodes[removed],undefined);
 });
 
 test('releasing one input does not release another held source',()=>{

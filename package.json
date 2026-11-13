@@ -1,1 +1,1 @@
-{"name":"phosphor-arcade","version":"3.0.0","private":true,"type":"module","description":"256 × 192 monochrome phosphor arcade","scripts":{"test":"node --test tests/*.test.mjs"}}
+{"name":"phosphor-arcade","version":"3.5.0","private":true,"type":"module","description":"256 × 192 monochrome phosphor arcade","scripts":{"test":"node --test tests/*.test.mjs"}}

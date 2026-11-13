@@ -5,18 +5,18 @@
  * browser UI can return. Leaving the root menu returns to the launch screen.
  */
 export class FullscreenController {
-  constructor({element,getMode,onBack,onExit,onChange=()=>{},onNotice=()=>{},onResize=()=>{},focusElement,isMobile=()=>false}) {
+  constructor({element,getMode,onBack,onExit,beforeExit,onChange=()=>{},onNotice=()=>{},onResize=()=>{},focusElement,isMobile=()=>false}) {
     this.element=element;
     this.doc=element.ownerDocument;
     this.view=this.doc.defaultView||globalThis;
     this.nav=this.view.navigator||globalThis.navigator;
-    this.getMode=getMode;this.onBack=onBack;this.onExit=onExit;this.onChange=onChange;
+    this.getMode=getMode;this.onBack=onBack;this.onExit=onExit;this.beforeExit=beforeExit;this.onChange=onChange;
     this.onNotice=onNotice;this.onResize=onResize;this.focusElement=focusElement;
     this.isMobile=typeof isMobile==='function'?isMobile:()=>Boolean(isMobile);
     this.keyboardLocked=false;this.pending=false;
     this._session=0;this._lockAttempt=-1;this._nativeWas=this.native;
     this._expectedExit=false;this._childBackAt=-Infinity;this._exitDelivered=false;
-    this._suppressUntil=-Infinity;this._destroyed=false;
+    this._suppressUntil=-Infinity;this._destroyed=false;this._leaving=null;
     this._change=()=>this._fullscreenChanged();
     this.doc.addEventListener('fullscreenchange',this._change);
   }
@@ -24,7 +24,7 @@ export class FullscreenController {
   get expanded(){return this.element.classList.contains('immersive');}
   isImmersive(){return this.native||this.expanded;}
   _now(){return this.view.performance?.now?.()??Date.now();}
-  _isChild(){const mode=this.getMode();return mode!=='menu'&&mode!=='home';}
+  _isChild(){return ['game','settings','test'].includes(this.getMode());}
   _completeExit(){
     if(this._exitDelivered)return;
     this._exitDelivered=true;
@@ -72,6 +72,9 @@ export class FullscreenController {
   async enter(){
     if(this.pending||this.isImmersive())return;
     const session=++this._session;
+    // A forced browser exit may expose Home while an old animation is pending.
+    // A new entry supersedes that exit rather than letting it close this session.
+    this._leaving=null;
     this.pending=true;this._expectedExit=false;this._childBackAt=-Infinity;this._exitDelivered=false;
     this._suppressUntil=-Infinity;this.onNotice('');
     try{
@@ -96,9 +99,24 @@ export class FullscreenController {
       if(session===this._session){this.pending=false;this._refresh(true);}
     }
   }
-  async leave(){
-    ++this._session;this.pending=false;this._childBackAt=-Infinity;
+  leave(){
+    if(this._leaving)return this._leaving;
+    const operation=this._leave();
+    this._leaving=operation;
+    const clear=()=>{if(this._leaving===operation)this._leaving=null;};
+    operation.then(clear,clear);
+    return operation;
+  }
+  async _leave(){
+    const session=++this._session;
+    this.pending=false;this._childBackAt=-Infinity;
     this._suppressUntil=-Infinity;this._expectedExit=this.native;
+    // Keep native/expanded presentation intact while the CRT powers down.
+    // Without a hook, onExit retains its existing synchronous delivery timing.
+    if(this.beforeExit){
+      try{await this.beforeExit();}catch{}
+      if(session!==this._session||this._destroyed)return;
+    }
     this._unlock();this.element.classList.remove('immersive');
     try{this.view.screen?.orientation?.unlock?.();}catch{}
     // Deliver exactly once even when fullscreenchange precedes the exit promise.
@@ -135,7 +153,7 @@ export class FullscreenController {
         return;
       }
       this.element.classList.remove('immersive');
-      void this._requestKeyboardLock(this._session);
+      if(!this._leaving)void this._requestKeyboardLock(this._session);
     }else if(wasNative){
       this._unlock();
       const alreadyWentBack=this._now()-this._childBackAt<400;

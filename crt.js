@@ -15,6 +15,8 @@
  * 15.72 kHz sweeps. Fast/slow decay constants are illustrative green phosphor.
  */
 
+import {DEFAULT_TINT,normalizeTint,phosphorColors,colorCSS} from './phosphor-color.js';
+
 const VS = `#version 300 es
 precision highp float;
 out vec2 uv;
@@ -30,12 +32,15 @@ uniform sampler2D previousState;
 uniform float clock;
 uniform float exposure;
 uniform float persistence;
+uniform float bufferMode;
+vec2 packLight(float v){float scaled=clamp(v/32.0,0.0,1.0)*255.0;return vec2(floor(scaled)/255.0,fract(scaled));}
 out vec4 color;
 void main(){
   ivec2 cell=ivec2(gl_FragCoord.xy);
   vec4 src=texelFetch(sourceImage,cell,0);
   float excitation=max(src.r,max(src.g,src.b));
-  vec2 energy=texelFetch(previousState,cell,0).rg;
+  vec2 stored=texelFetch(previousState,cell,0).rg;
+  vec2 energy=bufferMode>0.5?exp2(stored*8.0)-1.0:stored;
   const float period=1.0/60.0;
   // 35 blank lines above and below the 192-line active image. Source upload
   // is flipped into GL coordinates: scan from the physical top down.
@@ -64,7 +69,7 @@ void main(){
   energy*=decay;
   float tail=0.20*clamp(persistence,0.0,1.5);
   float light=dot(integral/max(exposure,0.0001),vec2(1.0-tail,tail));
-  color=vec4(energy,light,1.0);
+  color=bufferMode>0.5?vec4(log2(1.0+min(energy,vec2(255.0)))/8.0,packLight(light)):vec4(energy,light,1.0);
 }`;
 
 const BEAM = `#version 300 es
@@ -73,10 +78,13 @@ in vec2 uv;
 uniform sampler2D state;
 uniform float scanlines;
 uniform float brightness;
+uniform float bufferMode;
+vec2 packLight(float v){float scaled=clamp(v/32.0,0.0,1.0)*255.0;return vec2(floor(scaled)/255.0,fract(scaled));}
 out vec4 color;
 float signalAt(ivec2 p){
   if(p.x<0||p.x>=256||p.y<0||p.y>=192) return 0.0;
-  return texelFetch(state,p,0).b;
+  vec4 sampleValue=texelFetch(state,p,0);
+  return bufferMode>0.5?(sampleValue.b+sampleValue.a/255.0)*32.0:sampleValue.b;
 }
 void main(){
   vec2 position=uv*vec2(256.0,192.0)-0.5;
@@ -105,7 +113,7 @@ void main(){
     float dy=position.y-float(y);
     light+=row*exp(-0.5*dy*dy/(sigma*sigma))/(2.506628*sigma);
   }
-  color=vec4(vec3(light*brightness),1.0);
+  color=bufferMode>0.5?vec4(packLight(light*brightness),0.0,1.0):vec4(vec3(light*brightness),1.0);
 }`;
 
 const BLUR = `#version 300 es
@@ -113,12 +121,15 @@ precision highp float;
 in vec2 uv;
 uniform sampler2D image;
 uniform vec2 direction;
+uniform float bufferMode;
+float lightAt(vec2 p){vec4 v=texture(image,p);return bufferMode>0.5?(v.r+v.g/255.0)*32.0:v.r;}
+vec2 packLight(float v){float scaled=clamp(v/32.0,0.0,1.0)*255.0;return vec2(floor(scaled)/255.0,fract(scaled));}
 out vec4 color;
 void main(){
-  vec3 result=texture(image,uv).rgb*0.2270270270;
-  result+=(texture(image,uv+direction*1.3846153846).rgb+texture(image,uv-direction*1.3846153846).rgb)*0.3162162162;
-  result+=(texture(image,uv+direction*3.2307692308).rgb+texture(image,uv-direction*3.2307692308).rgb)*0.0702702703;
-  color=vec4(result,1.0);
+  float result=lightAt(uv)*0.2270270270;
+  result+=(lightAt(uv+direction*1.3846153846)+lightAt(uv-direction*1.3846153846))*0.3162162162;
+  result+=(lightAt(uv+direction*3.2307692308)+lightAt(uv-direction*3.2307692308))*0.0702702703;
+  color=bufferMode>0.5?vec4(packLight(result),0.0,1.0):vec4(vec3(result),1.0);
 }`;
 
 const COMPOSITE = `#version 300 es
@@ -136,6 +147,17 @@ uniform float ambient;
 uniform float reflection;
 uniform float environmentMode;
 uniform vec2 resolution;
+uniform float powerLevel;
+uniform vec2 powerScale;
+uniform float powerSpot;
+uniform float powerBend;
+uniform float powerFocus;
+uniform vec3 phosphorSpectrum;
+uniform vec3 glassTint;
+uniform vec3 coatingTint;
+uniform vec3 pageTint;
+uniform float bufferMode;
+float lightAt(sampler2D image,vec2 p){vec4 v=texture(image,p);return bufferMode>0.5?(v.r+v.g/255.0)*32.0:v.r;}
 out vec4 color;
 
 // All geometry is in screen-half-height units. The normal-incidence faceplate
@@ -207,7 +229,7 @@ vec3 encodeDisplay(vec3 light){
 void main(){
   const vec2 aspect=vec2(4.0/3.0,1.0);
   vec2 p=(uv*2.0-1.0)*aspect;
-  vec3 page=vec3(3.0,7.0,5.0)/255.0;
+  vec3 page=pageTint;
   float c=clamp(curvature,0.0,2.0),g=clamp(glass,0.0,2.0);
   float aa=max(0.0005,2.0/resolution.y);
   float outerDistance=roundedBox(p,vec2(1.308,0.975),0.112);
@@ -240,15 +262,50 @@ void main(){
   float innerDistance=roundedBox(innerPoint.xy,vec2(1.280,0.960),0.098);
   float phosphorMask=1.0-smoothstep(-aa,aa,innerDistance);
 
-  float direct=texture(beam,image).r;
-  float tight=texture(glow,image).r,wide=texture(scatter,image).r;
+  // Deflection changes the emitting raster, never the glass or reflection.
+  float across=clamp((image.x-0.5)/max(powerScale.x*0.5,0.001),-1.0,1.0);
+  // Residual yoke current bows the raster as its supply falls. Only emission
+  // bends; the faceplate, coating and room reflections stay stationary.
+  vec2 raster=image-vec2(0.0,powerBend*(1.0-across*across));
+  vec2 emission=(raster-0.5)/max(powerScale,vec2(0.001))+0.5;
+  vec2 boundary=abs(raster-0.5)-powerScale*0.5;
+  float emissionMask=(1.0-smoothstep(-aa,aa,boundary.x))*(1.0-smoothstep(-aa,aa,boundary.y));
+  float direct=lightAt(beam,emission);
+  float tight=lightAt(glow,emission),wide=lightAt(scatter,emission);
   // Approximate one extra internal round trip. Both its angular displacement
   // and attenuation grow with the glass path. Higher bounces are discarded.
   vec2 ghostShift=2.0*opticalPath*glassRay.xy/vec2(2.56,1.92);
-  float ghost=texture(glow,image+ghostShift).r;
+  float ghost=lightAt(glow,emission+ghostShift);
   float ghostFraction=outerF*innerF*exp(-1.4*opticalPath);
+  direct=mix(direct,tight,clamp(powerFocus*0.65,0.0,0.65));
   float tightWeight=clamp(bloom*0.19,0.0,0.38),wideWeight=clamp(bloom*0.14,0.0,0.28);
   float energy=mix(direct,ghost,ghostFraction)*(1.0-tightWeight-wideWeight)+tight*tightWeight+wide*wideWeight;
+
+  energy*=powerLevel*emissionMask;
+  // Once scanlines converge, integrate several rows instead of undersampling
+  // one arbitrary row of the compressed texture. The beam retains a finite
+  // Gaussian footprint: a collapsed raster is a luminous line, not a zero-width
+  // sampling artifact. Spatial concentration is capped as beam current decays.
+  float converged=1.0-smoothstep(0.025,0.18,powerScale.y);
+  if(converged>0.0){
+    float column=0.0;
+    for(int row=0;row<16;row++){
+      vec2 sampleUV=vec2(clamp(emission.x,0.0,1.0),(float(row)+0.5)/16.0);
+      column+=mix(lightAt(glow,sampleUV),lightAt(scatter,sampleUV),0.7);
+    }
+    column/=16.0;
+    float sigma=max(0.0017,0.75/resolution.y)*(1.0+powerFocus*2.3);
+    float lineProfile=exp(-0.5*pow((raster.y-0.5)/sigma,2.0));
+    float horizontalMask=1.0-smoothstep(-aa,aa,boundary.x);
+    float lineEnergy=min(3.0,column*11.0+0.05)*powerLevel*lineProfile*horizontalMask;
+    energy=mix(energy,lineEnergy,converged);
+    // Scatter has a wider, weaker footprint independent of deflection scale.
+    energy+=column*powerLevel*0.22*exp(-0.5*pow((raster.y-0.5)/(sigma*5.0),2.0))*horizontalMask*converged;
+  }
+  vec2 centerDistance=(image-0.5)*vec2(1.3333,1.0);
+  energy+=powerSpot*(exp(-dot(centerDistance,centerDistance)/0.000025)
+                  +0.09*exp(-dot(centerDistance,centerDistance)/0.00025));
+  wide*=powerLevel*emissionMask;
 
   // Fixed inner-surface phosphor grains: granular conversion efficiency, low-
   // frequency coating mottling, and tiny ambient reflectance. It is a coating,
@@ -289,9 +346,7 @@ void main(){
   // It raises black level independently of identifiable/specular reflections.
   // At zero room light the coating and marks vanish; only emission remains.
   float ambientCoating=(0.0020+grains*0.0015+coating*0.0008)*phosphorMask*roomLight*transmission;
-  vec3 phosphorSpectrum=vec3(0.035,1.0,0.115);
-  vec3 glassTint=vec3(0.20,0.72,0.30);
-  vec3 linearLight=energy*phosphorSpectrum+(reflected+edgeDepth)*glassTint+ambientCoating*vec3(0.10,0.70,0.24);
+  vec3 linearLight=energy*phosphorSpectrum+(reflected+edgeDepth)*glassTint+ambientCoating*coatingTint;
   vec3 surface=encodeDisplay(linearLight);
   float spill=(1.0-outerMask)*exp(-max(0.0,outerDistance)*95.0)*wide*bloom*0.008;
   color=vec4(mix(page,surface,outerMask)+encodeDisplay(spill*phosphorSpectrum),1.0);
@@ -317,8 +372,8 @@ function program(gl,fragment){
 
 export class CRTDisplay {
   constructor(canvas,sourceCanvas){
-    this.canvas=canvas; this.source=sourceCanvas;
-    this.options={brightness:1.08,persistence:1,bloom:1.15,curvature:1,glass:1.15,scanlines:1,ambient:0.35,reflection:0.45,environment:'diffuse',reducedMotion:false};
+    this.canvas=canvas; this.source=sourceCanvas;this.power={level:1,vertical:1,horizontal:1,spot:0};
+    this.options={tint:DEFAULT_TINT,brightness:1.73,persistence:1,bloom:1.4,curvature:1.85,glass:2,scanlines:1.6,ambient:1.5,reflection:1.45,environment:'diffuse',reducedMotion:false};
     this._backend='Canvas 2D fallback'; this._targets=[]; this._programs=[]; this._destroyed=false;
     this._contextLost=false; this._lostHandler=e=>{e.preventDefault();this._contextLost=true;this._backend='WebGL context lost';};
     this._restoreHandler=()=>{this._contextLost=false;this.gl=this.gl||this._blitGL;this._blitGL=null;try{this._initGL();this.resize();}catch(e){this._fallback(e);}};
@@ -334,7 +389,9 @@ export class CRTDisplay {
   get backend(){return this._backend;}
   _initGL(){
     const gl=this.gl;
-    if(!gl.getExtension('EXT_color_buffer_float')) throw new Error('Floating-point render targets unavailable');
+    // RGBA8 keeps the same raster, optics and power shaders on mobile GPUs
+    // without float render targets, instead of silently changing visual models.
+    this._byteTargets=!gl.getExtension('EXT_color_buffer_float');
     this._targets=[];this._programs=[];
     gl.disable(gl.DEPTH_TEST);gl.disable(gl.BLEND);gl.disable(gl.CULL_FACE);
     this.vao=gl.createVertexArray();gl.bindVertexArray(this.vao);
@@ -345,17 +402,33 @@ export class CRTDisplay {
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,256,192,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
     this.states=[this._target(256,192,false),this._target(256,192,false)]; this.stateIndex=0;
-    this._backend='WebGL 2 · layered glass / integrated raster';this._forceResize=true;
+    this._backend='WebGL 2 · layered glass / integrated raster'+(this._byteTargets?' · encoded targets':'');this._forceResize=true;
   }
   _target(width,height,linear=true){
     const gl=this.gl,texture=gl.createTexture(),fbo=gl.createFramebuffer();
+    let switchedEncoding=false;
     gl.bindTexture(gl.TEXTURE_2D,texture);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,linear?gl.LINEAR:gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,linear?gl.LINEAR:gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,width,height,0,gl.RGBA,gl.HALF_FLOAT,null);
+    gl.texImage2D(gl.TEXTURE_2D,0,this._byteTargets?gl.RGBA8:gl.RGBA16F,width,height,0,gl.RGBA,this._byteTargets?gl.UNSIGNED_BYTE:gl.HALF_FLOAT,null);
     gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,texture,0);
-    if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE){gl.deleteTexture(texture);gl.deleteFramebuffer(fbo);throw new Error('Incomplete phosphor framebuffer');}
+    if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE){
+      // Some mobile drivers advertise float rendering but reject a particular
+      // target size/format. Retry this target using the shared encoded path.
+      if(!this._byteTargets){
+        this._byteTargets=true;switchedEncoding=true;
+        gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,width,height,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+        this._backend='WebGL 2 · layered glass / integrated raster · encoded targets';
+      }
+      if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE){gl.deleteTexture(texture);gl.deleteFramebuffer(fbo);throw new Error('Incomplete phosphor framebuffer');}
+    }
+    if(switchedEncoding){
+      // A resize may fail after raw-float states have already accumulated light.
+      // Clear those old values before every shader begins decoding byte data.
+      for(const previous of this._targets){gl.bindFramebuffer(gl.FRAMEBUFFER,previous.fbo);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);}
+      gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);
+    }
     gl.viewport(0,0,width,height);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
     const target={texture,fbo,width,height};this._targets.push(target);return target;
   }
@@ -412,11 +485,13 @@ void main(){color=texture(pixels,uv);}`);
     for(const key of ['brightness','persistence','bloom','curvature','glass','scanlines','ambient','reflection']){
       if(Number.isFinite(partial[key]))this.options[key]=Math.max(0,Math.min(2,partial[key]));
     }
+    if('tint' in partial)this.options.tint=normalizeTint(partial.tint);
     if(['none','diffuse','window','studio','observer','mixed'].includes(partial.environment))this.options.environment=partial.environment;
     if('reducedMotion' in partial)this.options.reducedMotion=Boolean(partial.reducedMotion);
   }
   resize(){
-    const rect=this.canvas.getBoundingClientRect();
+    const bounds=this.canvas.getBoundingClientRect();
+    const rect={width:this.canvas.clientWidth||bounds.width,height:this.canvas.clientHeight||bounds.height};
     const dpr=Math.min(2,window.devicePixelRatio||1);
     // A modest size cap keeps all multipass buffers affordable on integrated GPUs.
     const pixelBudget=window.matchMedia?.('(pointer: coarse)').matches?900000:1470000;
@@ -441,20 +516,25 @@ void main(){color=texture(pixels,uv);}`);
     const gl=this.gl;
     gl.useProgram(program.p);gl.bindFramebuffer(gl.FRAMEBUFFER,target?target.fbo:null);
     gl.viewport(0,0,target?target.width:this.canvas.width,target?target.height:this.canvas.height);
+    if(program.uniforms.bufferMode!=null)gl.uniform1f(program.uniforms.bufferMode,this._byteTargets?1:0);
     let unit=0;
     for(const [name,texture] of Object.entries(textures)){
       gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1i(program.uniforms[name],unit++);
     }
     for(const [name,value] of Object.entries(uniforms)){
-      if(Array.isArray(value))gl.uniform2fv(program.uniforms[name],value);else gl.uniform1f(program.uniforms[name],value);
+      if(Array.isArray(value)){if(value.length===3)gl.uniform3fv(program.uniforms[name],value);else gl.uniform2fv(program.uniforms[name],value);}else gl.uniform1f(program.uniforms[name],value);
     }
     gl.drawArrays(gl.TRIANGLES,0,3);
+  }
+  setPower(state={}){
+    const clamp=(value,fallback,min=0)=>Number.isFinite(value)?Math.max(min,Math.min(1,value)):fallback;
+    this.power={level:clamp(state.level,1),vertical:clamp(state.vertical,1,.001),horizontal:clamp(state.horizontal,1,.001),spot:clamp(state.spot,0),bend:clamp(state.bend,0),focus:clamp(state.focus,0)};
   }
   render(timeSeconds,dtSeconds){
     if(this._destroyed||this._contextLost)return;
     const dt=Math.min(0.05,Math.max(0.001,Number.isFinite(dtSeconds)?dtSeconds:1/60));
     if(!this.gl){this._renderFallback(dt);return;}
-    const gl=this.gl,o=this.options;
+    const gl=this.gl,o=this.options,colors=phosphorColors(this.options.tint);
     gl.bindVertexArray(this.vao);
     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,this.inputTexture);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);
@@ -475,33 +555,75 @@ void main(){color=texture(pixels,uv);}`);
     this._pass(this.programs.blur,this.glowTarget,{image:this.blurHalf.texture},{direction:[0,2.0/h]});
     this._pass(this.programs.blur,this.blurQuarter,{image:this.glowTarget.texture},{direction:[9.0/w,0]});
     this._pass(this.programs.blur,this.scatterTarget,{image:this.blurQuarter.texture},{direction:[0,9.0/h]});
-    this._pass(this.programs.composite,null,{beam:this.beamTarget.texture,glow:this.glowTarget.texture,scatter:this.scatterTarget.texture},{clock:this._clock,curvature:o.curvature,glass:o.glass,bloom:o.bloom,motion:o.reducedMotion?0:1,ambient:o.ambient,reflection:o.reflection,environmentMode:['none','diffuse','window','studio','observer','mixed'].indexOf(o.environment),resolution:[w,h]});
+    this._pass(this.programs.composite,null,{beam:this.beamTarget.texture,glow:this.glowTarget.texture,scatter:this.scatterTarget.texture},{clock:this._clock,curvature:o.curvature,glass:o.glass,bloom:o.bloom,motion:o.reducedMotion?0:1,ambient:o.ambient,reflection:o.reflection,environmentMode:['none','diffuse','window','studio','observer','mixed'].indexOf(o.environment),resolution:[w,h],powerLevel:this.power.level,powerScale:[this.power.horizontal,this.power.vertical],powerSpot:this.power.spot,powerBend:this.power.bend||0,powerFocus:this.power.focus||0,phosphorSpectrum:colors.spectrum,glassTint:colors.glass,coatingTint:colors.coating,pageTint:colors.page.map(v=>v/255)});
   }
   _renderFallback(dt){
     const ctx=this.fallback;if(!ctx)return;
-    const b=this._fallbackContext,o=this.options,w=this.canvas.width,h=this.canvas.height;
+    const b=this._fallbackContext,o=this.options,w=this.canvas.width,h=this.canvas.height,colors=phosphorColors(o.tint);
     b.globalCompositeOperation='source-over';b.fillStyle=`rgba(0,0,0,${1-Math.exp(-dt/(0.022*Math.max(0.08,o.persistence)))})`;b.fillRect(0,0,256,192);
     b.globalCompositeOperation='lighter';b.globalAlpha=0.65;b.drawImage(this.source,0,0);b.globalAlpha=1;b.globalCompositeOperation='source-over';
-    ctx.fillStyle='#030705';ctx.fillRect(0,0,w,h);ctx.save();
+    ctx.fillStyle=colorCSS(colors.page);ctx.fillRect(0,0,w,h);ctx.save();
     const r=w*0.025;ctx.beginPath();ctx.roundRect(w*0.025,h*0.025,w*0.95,h*0.95,r);ctx.clip();
-    ctx.imageSmoothingEnabled=true;ctx.filter=`blur(${Math.max(0,o.bloom)*w/320}px)`;ctx.globalAlpha=0.35;ctx.drawImage(this._fallbackBuffer,0,0,w,h);
-    ctx.filter='none';ctx.globalAlpha=Math.min(1,o.brightness);ctx.drawImage(this._fallbackBuffer,0,0,w,h);
-    ctx.globalCompositeOperation='multiply';ctx.fillStyle='#25e55c';ctx.fillRect(0,0,w,h);ctx.globalCompositeOperation='source-over';ctx.globalAlpha=0.32*Math.min(1,o.scanlines);ctx.fillStyle='#000';
-    for(let y=0;y<192;y++)ctx.fillRect(0,(y+0.65)*h/192,w,h/192*0.35);
-    ctx.globalAlpha=1;ctx.globalCompositeOperation='screen';
-    ctx.fillStyle=`rgba(11,30,16,${o.ambient*0.18})`;ctx.fillRect(0,0,w,h);
+    const power=this.power;ctx.save();ctx.translate(w/2,h/2);ctx.scale(power.horizontal,power.vertical);ctx.translate(-w/2,-h/2);
+    const bend=power.bend||0,focus=power.focus||0,columns=bend>.00005?32:1;
+    for(let col=0;col<columns;col++){
+      const x=col*w/columns,cw=w/columns,across=(col+.5)/columns*2-1;
+      // Reverse the UV y direction used by WebGL. Keep beam width finite even
+      // as vertical deflection approaches zero.
+      const offset=-bend*(1-across*across)*h/Math.max(.001,power.vertical);
+      ctx.save();ctx.translate(0,offset);
+      const draw=()=>columns===1?ctx.drawImage(this._fallbackBuffer,0,0,w,h):ctx.drawImage(this._fallbackBuffer,col*256/columns,0,256/columns,192,x,0,cw+.5,h);
+      ctx.imageSmoothingEnabled=true;ctx.filter=`blur(${(Math.max(0,o.bloom)+focus*2)*w/320}px)`;ctx.globalAlpha=.35*power.level;draw();
+      ctx.filter=focus>.001?`blur(${focus*w/480}px)`:'none';ctx.globalAlpha=Math.min(1,o.brightness)*power.level;draw();
+      ctx.filter='none';ctx.globalCompositeOperation='multiply';ctx.globalAlpha=1;ctx.fillStyle=colorCSS(colors.beam);ctx.fillRect(x,0,cw+.5,h);
+      ctx.globalCompositeOperation='source-over';ctx.globalAlpha=.32*Math.min(1,o.scanlines);ctx.fillStyle='#000';
+      for(let y=0;y<192;y+=Math.max(1,Math.ceil(192/(h*power.vertical))))ctx.fillRect(x,(y+.65)*h/192,cw+.5,h/192*.35);
+      ctx.restore();
+    }
+    ctx.restore();ctx.globalAlpha=1;ctx.globalCompositeOperation='screen';
+    if(power.vertical<.18&&power.level>0){
+      const ratio=Math.max(0,Math.min(1,(power.vertical-.025)/.155));
+      const convergence=1-ratio*ratio*(3-2*ratio);
+      // Match GL's content-derived integrated column, rather than inventing a
+      // fixed-strength line unrelated to the actual phosphor image.
+      const data=b.getImageData?.(0,0,256,192)?.data;
+      const columnLight=Array.from({length:32},(_,col)=>{
+        if(!data)return 0;
+        let sum=0;
+        for(let row=0;row<16;row++)for(let x=0;x<8;x++)sum+=data[(Math.floor((row+.5)*12)*256+col*8+x)*4]/255;
+        return sum/128*Math.max(0,o.brightness);
+      });
+      for(let col=0;col<columns;col++){
+        const across=(col+.5)/columns*2-1,offset=-bend*(1-across*across)*h;
+        const sample=Math.min(31,Math.floor((col+.5)/columns*32));
+        let averaged=0,weights=0;
+        for(let dx=-2;dx<=2;dx++){const weight=3-Math.abs(dx);averaged+=columnLight[Math.max(0,Math.min(31,sample+dx))]*weight;weights+=weight;}
+        const lineEnergy=Math.min(3,averaged/weights*11+.05)*power.level*convergence;
+        const strength=1-Math.exp(-lineEnergy*1.1);
+        const spread=Math.max(.0017,.75/h)*(1+focus*2.3)*5;
+        const line=ctx.createLinearGradient(0,h*(.5-spread)+offset,0,h*(.5+spread)+offset);
+        line.addColorStop(0,colorCSS(colors.line,0));line.addColorStop(.42,colorCSS(colors.line,strength*.08));
+        line.addColorStop(.5,colorCSS(colors.core,strength));line.addColorStop(.58,colorCSS(colors.line,strength*.08));line.addColorStop(1,colorCSS(colors.line,0));
+        ctx.fillStyle=line;ctx.fillRect(w*(1-power.horizontal)/2+col*w*power.horizontal/columns,h*(.5-spread)+offset,w*power.horizontal/columns+.5,h*spread*2);
+      }
+    }
+    if(power.spot>0){
+      const spot=ctx.createRadialGradient(w/2,h/2,0,w/2,h/2,h*.016);
+      spot.addColorStop(0,colorCSS(colors.spot,Math.min(1,power.spot*3)));spot.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=spot;ctx.fillRect(0,0,w,h);
+    }
+    ctx.fillStyle=colorCSS(colors.ambient,o.ambient*.18);ctx.fillRect(0,0,w,h);
     if(o.environment!=='none'&&o.ambient>0&&o.reflection>0){
       // Cache a small unresolved room field. The fallback keeps all preset
       // choices, while its documented reduced optics omit refracted rays.
-      if(this._roomPreset!==o.environment){
-        this._roomPreset=o.environment;
+      if(this._roomPreset!==o.environment||this._roomTint!==o.tint){
+        this._roomPreset=o.environment;this._roomTint=o.tint;
         this._roomCanvas??=document.createElement('canvas');
         this._roomCanvas.width=256;this._roomCanvas.height=192;
         const room=this._roomCanvas.getContext('2d');
         const lobe=(x,y,rx,ry,alpha)=>{
           room.save();room.translate(x,y);room.scale(rx,ry);
           const gradient=room.createRadialGradient(0,0,0,0,0,1);
-          gradient.addColorStop(0,`rgba(55,90,62,${alpha})`);
+          gradient.addColorStop(0,colorCSS(colors.room,alpha));
           gradient.addColorStop(1,'rgba(0,0,0,0)');
           room.fillStyle=gradient;room.fillRect(-1,-1,2,2);room.restore();
         };

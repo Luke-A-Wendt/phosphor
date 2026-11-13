@@ -14,13 +14,13 @@ function harness(options=DISPLAY_DEFAULTS){
 }
 
 test('settings preserve short joystick taps and repeat held adjustments after a delay',()=>{
- const h=harness();h.tap('ArrowRight');assert.equal(h.screen.options.ambient,.4);
- h.input.set('stick',['ArrowRight']);h.frame();assert.equal(h.screen.options.ambient,.45);
- for(let n=0;n<30;n++)h.frame();assert.equal(h.screen.options.ambient,.45);
- for(let n=0;n<30;n++)h.frame();assert.ok(h.screen.options.ambient>.45);
+ const h=harness();h.tap('ArrowRight');assert.equal(h.screen.options.ambient,1.55);
+ h.input.set('stick',['ArrowRight']);h.frame();assert.equal(h.screen.options.ambient,1.6);
+ for(let n=0;n<30;n++)h.frame();assert.equal(h.screen.options.ambient,1.6);
+ for(let n=0;n<30;n++)h.frame();assert.ok(h.screen.options.ambient>1.6);
  h.input.clear();h.screen.release();h.frame();const value=h.screen.options.ambient;
  for(let n=0;n<60;n++)h.frame();assert.equal(h.screen.options.ambient,value);
- h.tap('ArrowDown');assert.equal(h.screen.index,1);h.tap('ArrowLeft');assert.equal(h.screen.options.reflection,.4);
+ h.tap('ArrowDown');assert.equal(h.screen.index,1);h.tap('ArrowLeft');assert.equal(h.screen.options.reflection,1.4);
 });
 
 test('numeric bounds, opposite directions, and diagonal navigation are safe',()=>{
@@ -44,9 +44,9 @@ test('environment and stable display use directions and the single action button
 
 test('test is only activated from its row and reset uses supplied session defaults',()=>{
  const h=harness();h.tap('Space');assert.equal(h.tests,0);
- for(let n=0;n<10;n++)h.tap('ArrowDown');assert.equal(h.screen.index,10);
+ for(let n=0;n<15;n++)h.tap('ArrowDown');assert.equal(h.screen.index,15);
  h.tap('ArrowRight');assert.equal(h.tests,0);
- h.tap('Space');assert.equal(h.tests,1);assert.equal(h.screen.index,10);
+ h.tap('Space');assert.equal(h.tests,1);assert.equal(h.screen.index,15);
  h.tap('ArrowDown');h.tap('Space');assert.deepEqual(h.screen.options,DISPLAY_DEFAULTS);
  assert.notEqual(h.changes.at(-1),DISPLAY_DEFAULTS);
  const custom=new SettingsScreen({defaults:{...DISPLAY_DEFAULTS,reducedMotion:true}});
@@ -60,15 +60,40 @@ test('all settings remain legible inside the 256 by 192 monochrome raster',()=>{
   rectangles++;assert.ok([x,y,w,height].every(Number.isFinite));assert.ok(x>=0&&y>=0&&x+w<=256&&y+height<=192);
   const rgb=this.fillStyle.match(/^rgb\((\d+),(\d+),(\d+)\)$/);assert.ok(rgb);assert.equal(rgb[1],rgb[2]);assert.equal(rgb[2],rgb[3]);
  }};
- for(let row=0;row<12;row++){h.screen.render(ctx,row%2===0);assert.ok(h.screen.selectionLabel.length);h.tap('ArrowDown');}
+ for(let row=0;row<17;row++){h.screen.render(ctx,row%2===0);assert.ok(h.screen.selectionLabel.length);h.tap('ArrowDown');}
  assert.ok(rectangles>1000);assert.equal(h.screen.index,0);
 });
 
 test('resetting selection restores the top row and releases held menu adjustment',()=>{
- const h=harness();h.screen.index=100;assert.equal(h.screen.index,11);assert.equal(h.screen.top,5);
+ const h=harness();h.screen.index=100;assert.equal(h.screen.index,16);assert.equal(h.screen.top,10);
  h.screen.index=4.9;assert.equal(h.screen.index,4);assert.equal(h.screen.top,4);
  h.screen.index=-2;assert.equal(h.screen.index,0);assert.equal(h.screen.top,0);
  h.screen.index=NaN;assert.equal(h.screen.index,0);
  h.input.set('stick',['ArrowRight']);h.frame();assert.equal(h.screen.adjustDirection,1);
  h.screen.index=0;assert.equal(h.screen.adjustDirection,0);assert.equal(h.screen.adjustClock,0);
+});
+
+
+test('four sound sliders are independent, bounded to silence/full volume, and reset with the session',()=>{
+ const h=harness();const keys=['musicVolume','gameVolume','keyboardVolume','monitorVolume'];
+ for(let i=0;i<keys.length;i++){
+  const key=keys[i];h.screen.index=10+i;const original={...h.screen.options};
+  h.tap('ArrowRight');assert.equal(h.screen.options[key],Math.min(1,Math.round((original[key]+.05)*100)/100));
+  for(const other of keys.filter(k=>k!==key))assert.equal(h.screen.options[other],original[other]);
+  h.screen.setOptions({...h.screen.options,[key]:0});h.tap('ArrowLeft');assert.equal(h.screen.options[key],0);
+  h.screen.setOptions({...h.screen.options,[key]:1});h.tap('ArrowRight');assert.equal(h.screen.options[key],1);
+ }
+ h.screen.index=16;h.tap('Space');assert.deepEqual(h.screen.options,DISPLAY_DEFAULTS);
+});
+
+test('tint slider changes immediately through the hue wheel and reset restores green',()=>{
+ const h=harness();h.screen.index=14;assert.equal(h.screen.selectionLabel,'TINT: 125 DEG');
+ h.tap('ArrowRight');assert.equal(h.screen.options.tint,130);assert.equal(h.changes.at(-1).tint,130);
+ h.tap('ArrowLeft');assert.equal(h.screen.options.tint,125);assert.equal(h.tests,0);
+ h.screen.setOptions({...h.screen.options,tint:0});h.tap('ArrowLeft');assert.equal(h.screen.options.tint,0);
+ h.screen.setOptions({...h.screen.options,tint:355});h.tap('ArrowRight');assert.equal(h.screen.options.tint,360);
+ h.tap('ArrowRight');assert.equal(h.screen.options.tint,360);
+ h.tap('Space');assert.equal(h.tests,0,'tint action never opens the display test');
+ h.tap('ArrowDown');h.tap('Space');assert.equal(h.tests,1);
+ h.tap('ArrowDown');h.tap('Space');assert.equal(h.screen.options.tint,125);
 });

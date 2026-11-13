@@ -1,25 +1,25 @@
-# [PHOSPHOR](https://luke-a-wendt.github.io/phosphor/)
+# [PHOSPHORUS](https://luke-a-wendt.github.io/phosphorus/)
 
 Eight minimal arcade games behind curved green glass. **PHOSPHOR** draws its games, menus, settings, and calibration patterns into the same 256 × 192 monochrome raster.
 
 ## Open and play
 
-The home page is black with one glowing **OPEN PHOSPHOR** button. Click it to enter fullscreen. Everything else is inside the monitor.
+The home page is one black, full-page button. The glowing prompt says **CLICK TO OPEN PHOSPHOR** on desktop or **TAP TO OPEN PHOSPHOR** on touch devices. Click or tap anywhere on the page to enter fullscreen. The prompt stays centered in the visible page viewport as browser bars change. Everything else is inside the monitor.
 
-Use **WASD or the arrow keys** for movement and **Space** as the action button. Select a game with up/down, then press Space. Press Space after a game ends to restart.
+Use **arrow keys (or WASD)** for movement and **Enter** as the action button. Select a game with up/down, then press Enter. Press Enter after a game ends to restart.
 
-| Game | Movement | Action button |
+| Game | Movement | Enter |
 | --- | --- | --- |
 | Tetris | Left/right move; up rotates; down lowers | Hard drop |
 | Pong | Up/down move the paddle | Serve |
 | Breakout | Left/right move the paddle | Launch |
 | Asteroids | Left/right turn; up thrusts | Fire; hold for repeated shots |
-| Space Invaders | Left/right move | Fire; hold for repeated shots |
+| Invaders | Left/right move | Fire; hold for repeated shots |
 | Snake | Directions steer; reversing into yourself is blocked | Hold to move faster |
-| Lunar Lander | Left/right tilt; up also thrusts | Hold to thrust |
-| Scorched Tanks | Left/right aim; up/down adjust power | Fire |
+| Lander | Left/right tilt; up also thrusts | Hold to thrust |
+| Tanks | Left/right aim; up/down adjust power | Fire |
 
-Snake grows as it eats. Lunar Lander requires a gentle, level landing with both feet on the pad; fuel and lives are limited. Scorched Tanks is a simplified turn-based artillery duel against the computer, with wind, destructible terrain, and blast damage.
+Snake grows as it eats. Lander requires a gentle, level landing with both feet on the pad; fuel and lives are limited. Tanks is a simplified turn-based artillery duel against the computer, with wind, destructible terrain, and blast damage. Its opponent begins with an uncertain range estimate, then corrects later shots from its actual previous impact and changes in wind. A first-shot hit is possible, but the opponent usually needs to calibrate.
 
 High scores stay in your browser. Losing focus pauses a game; the action button resumes it.
 
@@ -30,20 +30,21 @@ The menu hint is **ESC BACK**. Escape and the mobile ESC button have the same be
 | Current screen | One Escape goes to |
 | --- | --- |
 | Game | Root menu |
-| Display settings | Root menu |
-| Calibration test | Display settings, retaining the selected row |
+| Settings | Root menu |
+| Calibration test | Settings, retaining the selected row |
 | Root menu | Black home page, exiting fullscreen |
 
-Returning to the home page resets every display setting to its default. Display settings last only for the current visit inside the monitor. High scores are retained.
+Returning to the home page resets every display setting to its default. Settings last only for the current visit inside the monitor. High scores are retained.
 
 In browsers that permit keyboard locking, nested back navigation stays in native fullscreen. If a browser reserves Escape, the app preserves the previous screen in an expanded page view; browser controls may return. Holding Escape can activate the browser's fullscreen escape hatch. Browser Back also steps through the app while it is open.
 
 ## Settings and calibration
 
-Select **Display settings** from the root menu. The controls are phosphor pixels rendered behind the glass; there are no HTML settings panels or pop-up windows.
+Select **Settings** from the root menu. The controls are phosphor pixels rendered behind the glass; there are no HTML settings panels or pop-up windows.
 
-Use up/down to select a setting, left/right to adjust it, and Space to activate it. The list scrolls as you move. **Display test** is available only from settings. Space cycles its grid/levels, beam/focus, and motion/decay patterns; Escape returns to settings.
+Use up/down to select a setting, left/right to adjust it, and Enter to activate it. The list scrolls as you move. **Display test** is available only from settings. Enter cycles its grid/levels, beam/focus, and motion/decay patterns; Escape returns to settings.
 
+- **Tint** selects the monochrome hue across the full color wheel. The default is the original green; glow, line/spot decay and glass tones follow the selected tint. Reset settings or exit to Home restores green.
 - **Ambient light** ranges from a dark room to an illuminated room, raising the textured phosphor surface's black level along with reflected light.
 - **Reflection** controls environmental glare independently. Environments are **Off**, **Soft room**, **Daylight**, **Desk light**, **Observer**, and **Mixed light**. The observer is a faint procedural silhouette; no camera is used.
 - Beam intensity, afterglow, light scatter, scanlines, curvature, glass depth, and stable display are adjustable. **Reset settings** restores defaults immediately.
@@ -52,11 +53,23 @@ At zero ambient light, room reflections and ambient phosphor illumination disapp
 
 ## Mobile
 
-Play in **landscape**. Portrait displays a rotate-to-play prompt and pauses gameplay. The left circular joystick springs back to its center when released; the right circular button is the action. The top-left **ESC** button is always available inside the monitor, including at the root menu and rotation prompt. Movement and action support simultaneous touches.
+PHOSPHOR uses a landscape-only layout. If native orientation lock is unavailable, the complete interface turns sideways while the phone is upright, without a rotation prompt. A matched set of generated, photorealistic Amiga-style keycaps replaces the joystick: an inverted-T arrow cluster at bottom left, a vertical Enter key at bottom right, and **ESC** at top left. All six were generated together with the same overhead view, dim soft lighting, well-worn grey-beige material, and complete key edges. Pressing a key slightly reduces its apparent size and compresses its shadow into a fixed dark well. Slide between arrows or press movement and action together; cancellation and focus loss release all keys. ESC remains available at the root menu.
 
-The 4:3 display uses the full available landscape height, limited by viewport width. Controls overlay the screen when space is tight rather than reserving margins that shrink it.
+The 4:3 display uses the full available height whenever it can fit alongside usable controls. Keys expand to consume the remaining horizontal space, with equal 8-pixel clearance from the right arrow to the glass and from the glass to the action key. This offsets the monitor right. For example, a 780 × 312 CSS-pixel viewport fits a 416 × 312 display and 81.5-pixel keys. On narrower screens, keys retain 44-pixel touch targets and the display reduces to fit. Extra space on unusually wide screens stays outside the control groups. Safe-area insets are respected.
 
 Native fullscreen and landscape locking are requested where supported. Otherwise, the app fills the available page viewport. An embedded viewer's header, status bar, or edit overlay belongs to the host app; open the site directly in your browser for the fullest view.
+
+## Sound and power
+
+The screen warms in over two visible seconds with a thermal cathode response. Warm-up and its sound wait until fullscreen entry has settled and the screen is visible in either orientation. Hidden pages pause warm-up. Power timing follows elapsed visible time independently of the game timestep, so dropped frames do not stretch it away from the sound. Shutdown lasts 1.8 seconds: vertical deflection bows and collapses into a lingering line, horizontal deflection contracts it, and a residual phosphor spot fades. Finite beam width keeps the line visible while the glass stays stationary. These timings are deliberately slowed to make the modeled sequence easier to see; Stable display uses a gentle fade instead. Back can complete shutdown even when startup was waiting for fullscreen.
+
+Sound is synthesized locally with Web Audio: a subdued relay movement, decaying degauss hum, quiet flyback whine, cabinet hum, and a low, springy damped release. Keyboard presses vary slightly in pitch, resonance, timing, and noise. Games have individual effects, including impacts, shots, scoring, lander/ship thrust, and invader steps. Tetris plays an original synthesized arrangement of the traditional melody **Korobeiniki**.
+
+Lander and Asteroids use restrained, sustained filtered noise for thrust, with Asteroids mixed lower, with a short release when thrust stops. Tanks has a brief cannon report and a separate impact with a brief noise burst followed by roughly four seconds of normalized bass and gravelly midrange rumble, with soft saturation and irregular swells that remain audible above phone-speaker rolloff. Invaders has a four-pulse march triggered by each formation movement, so its tempo follows the surviving aliens and wave speed; the passing saucer has its own continuous wobble. Pong and Breakout use short square-wave hits, with separate Tetris and Snake feedback. These are original procedural approximations of arcade sound characteristics, rather than samples taken from the games.
+
+Inside Settings, **Music**, **Game sounds**, **Keyboard**, and **Monitor** independently range from 0% (mute) to 100%. All four default to 100%. Volumes reset with the display when returning home. Pause and hidden tabs stop game audio; music plays only during active Tetris. Sound begins after opening the app, subject to browser/device audio permissions. Fresh gestures recover suspended or interrupted audio contexts, closed contexts are recreated, and power sounds wait until the audio clock is running. Lander thrust/crash and tank fire/explosions include midrange layers for smaller speakers.
+
+The audio and power sequences are physically informed approximations, not recordings or measurements of a particular CRT or keyboard. No copyrighted game recordings or external audio downloads are used.
 
 ## The display
 
@@ -65,7 +78,7 @@ The games use a **256 × 192**, **4:3** source image with square pixels before g
 The dependency-free WebGL2 renderer combines:
 
 - A 60 Hz progressive timing model with 262 total lines, 192 active scanlines, and blanking.
-- Scan-timed excitation and integrated fast/slow phosphor decay in floating-point history buffers.
+- Scan-timed excitation and integrated fast/slow phosphor decay in floating-point or encoded 16-bit-light history buffers.
 - Brightness-dependent Gaussian beam reconstruction, horizontal bandwidth, and edge focus.
 - Fixed phosphor texture behind a separate glass surface.
 - Finite-thickness curved glass, ray intersections, Snell refraction, Fresnel reflection/transmission, and path-dependent absorption.
@@ -74,7 +87,7 @@ The dependency-free WebGL2 renderer combines:
 
 There is no monitor housing or bezel. This is a **physically informed visual model**, not a calibrated reproduction of a measured tube. Material and phosphor parameters are modeled choices. It does not simulate individual electrons, detailed deflection circuitry, permanent burn-in, or measured emission spectra. Asteroids uses this raster rather than a historical vector display.
 
-A simpler Canvas fallback keeps the games playable without WebGL2 or floating-point targets, with reduced glass optics.
+WebGL2 devices without floating-point render targets use encoded RGBA8 buffers with the same raster, glass, and power shaders. A simpler Canvas fallback remains for devices without WebGL2, with reduced glass optics and the same power timing and content-dependent line collapse.
 
 ## Run locally
 
@@ -100,7 +113,7 @@ With Node.js installed:
 npm test
 ```
 
-Tests cover game progression and collisions, Tetris visibility after line clears, native landscape geometry, new-game physics and turns, menu and joystick input, settings controls, calibration, and nested fullscreen/back navigation.
+Tests cover game progression and collisions, Tetris visibility after line clears, native landscape geometry, new-game physics and turns, menu and touch-key input, settings controls, calibration, sound lifecycle, and nested fullscreen/back navigation.
 
 ## Files
 
@@ -108,16 +121,27 @@ Tests cover game progression and collisions, Tetris visibility after line clears
 | --- | --- |
 | `app.js` | Launcher, session lifecycle, navigation, input, and rendering loop |
 | `interface.js` | Pixel launcher lettering and CRT root menu |
-| `controls.js` | Input-source merging, joystick mapping, menu navigation |
+| `controls.js` | Input-source merging and menu navigation |
+| `touch-keys.js` | Multitouch keycaps, slide transitions, and release handling |
+| `viewport-layout.js` | Visible-viewport geometry, full-height CRT, and maximum mobile key sizes |
+| `audio.js` | Procedural keyboard, monitor, game audio, and Tetris music |
+| `power-sequence.js` | Warm-up and shutdown timing |
 | `fullscreen.js` | Native fullscreen, keyboard locking, and expanded-view fallback |
 | `settings-screen.js` | Pixel settings navigation and rendering |
 | `display-settings.js` | Defaults and numeric validation |
 | `calibration.js` | Grid, beam, and motion test patterns |
 | `games.js` | Five original games, bitmap font, and game registry |
-| `extra-games.js` | Snake, Lunar Lander, and Scorched Tanks |
+| `extra-games.js` | Snake, Lander, and Tanks |
 | `crt.js` | Scan, phosphor, glass, reflection, and glow rendering |
 | `style.css` | Black launcher, fullscreen layout, minimal touch controls |
+| `key-*.webp` | Generated photorealistic keycaps used by the mobile keyboard |
+| `KEYCAP-SOURCES.txt` | Keycap generation and extraction details |
+| `assets/key-atlas.png` | Original generated keycap atlas |
+| `assets/key-atlas-prompt.txt` | Complete image-generation prompt |
+| `scripts/prepare-keycaps.py` | Reproducible extraction from the retained atlas |
 
 ## License
 
-[MIT](LICENSE). Original code and pixel graphics; no ROMs or extracted assets. Classic game names identify gameplay inspirations.
+[MIT](LICENSE) for the original code and pixel graphics. Classic game names identify gameplay inspirations; no ROMs or extracted game assets are included.
+
+The current keycap artwork was AI-generated for PHOSPHOR and is included with the project. It is not a photograph of a physical keyboard. See [KEYCAP-SOURCES.txt](KEYCAP-SOURCES.txt) for the retained atlas, prompt, and extraction details. The earlier third-party photographic key crops are no longer used.

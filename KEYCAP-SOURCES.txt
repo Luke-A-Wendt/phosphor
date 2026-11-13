@@ -1,0 +1,44 @@
+PHOSPHOR generated Amiga-style keycaps
+
+These six assets are AI-generated photorealistic images, not photographs of
+physical keys. They were created together as one matched transparent atlas
+using the built-in image-generation tool on 2026-11-13. No third-party source
+photograph was used. They replace the previous Unicomp photographic crops.
+
+Art direction
+-------------
+Five 1U keys (Esc, up, left, down, right) plus a vertical Enter key, all from
+the same imagined old Amiga-style keyboard: well-worn muted grey-beige ABS, fine
+grain, polished contact patches, scuffs and ingrained recess dirt, centered charcoal legends and shallow sculpted
+faces. All share a perpendicular overhead view and the same soft upper-left
+illumination, dimmed for a dark CRT room. Background alpha was generated with the image and is preserved.
+
+Retained source
+---------------
+assets/key-atlas.png: edited generated RGBA atlas, 1774 x 887 pixels.
+SHA-256: 8118ef6614546e8d04f9b86a112e5bae57f0d5756cacc3e56a55f90c1b27d170
+assets/key-atlas-prompt.txt: complete surface-ageing edit prompt.
+
+The source square keycaps are approximately 404 x 400 pixels each. The tall
+Enter key is approximately 405 x 833 pixels. Each complete key perimeter is
+extracted with a small transparent margin. No printed legend, texture,
+lighting or surface detail is painted or replaced during extraction.
+
+Web assets
+----------
+key-esc.webp, key-up.webp, key-left.webp, key-down.webp, key-right.webp:
+384 x 384 pixels each.
+key-enter.webp: 384 x 792 pixels.
+
+The original atlas is cropped and Lanczos-resampled to a consistent control
+scale. Enter is normalized to the two-key-height control's proportions with
+its small inter-key gap. Lossless WebP encoding preserves the extracted alpha
+and image content. No additional AI upscaling is used.
+
+Reproduction
+------------
+With Pillow installed, run:
+  python scripts/prepare-keycaps.py
+
+The script verifies the retained atlas checksum and rewrites the six WebP
+assets. It works in both the development repository and GitHub Pages export.

@@ -1,13 +1,13 @@
 import {pixelText} from './games.js';
 export const GAME_HINTS={
- tetris:'LEFT RIGHT MOVE / UP ROTATE / SPACE DROP',
- pong:'UP DOWN MOVE / SPACE SERVE',
- breakout:'LEFT RIGHT MOVE / SPACE LAUNCH',
- asteroids:'LEFT RIGHT TURN / UP THRUST / SPACE FIRE',
- invaders:'LEFT RIGHT MOVE / SPACE FIRE',
- snake:'DIRECTIONS STEER / HOLD SPACE BOOST',
- lander:'LEFT RIGHT TILT / SPACE THRUST',
- tanks:'LEFT RIGHT AIM / UP DOWN POWER / SPACE FIRE',
+ tetris:'LEFT RIGHT MOVE / UP ROTATE / ENTER DROP',
+ pong:'UP DOWN MOVE / ENTER SERVE',
+ breakout:'LEFT RIGHT MOVE / ENTER LAUNCH',
+ asteroids:'LEFT RIGHT TURN / UP THRUST / ENTER FIRE',
+ invaders:'LEFT RIGHT MOVE / ENTER FIRE',
+ snake:'DIRECTIONS STEER / HOLD ENTER BOOST',
+ lander:'LEFT RIGHT TILT / ENTER THRUST',
+ tanks:'LEFT RIGHT AIM / UP DOWN POWER / ENTER FIRE',
  settings:'ADJUST THE LIGHT AND GLASS'
 };
 export function drawRoot(ctx,items,index,touch=false){
@@ -21,11 +21,11 @@ export function drawRoot(ctx,items,index,touch=false){
  });
  pixelText(ctx,GAME_HINTS[items[index].id]||'',128,155,1,.32,'center');
  ctx.fillStyle='#202020';ctx.fillRect(53,165,150,1);
- pixelText(ctx,touch?'STICK SELECT / BUTTON PLAY':'UP DOWN SELECT / SPACE PLAY',128,171,1,.42,'center');
+ pixelText(ctx,'UP DOWN SELECT / ENTER PLAY',128,171,1,.42,'center');
  pixelText(ctx,'ESC BACK',128,181,1,.42,'center');
 }
-export function drawLaunch(ctx){
- ctx.clearRect(0,0,192,48);
- pixelText(ctx,'OPEN PHOSPHOR',96,17,3,1,'center');
- ctx.globalCompositeOperation='source-in';ctx.fillStyle='#66ff84';ctx.fillRect(0,0,192,48);ctx.globalCompositeOperation='source-over';
+export function drawLaunch(ctx,touch=false){
+ ctx.clearRect(0,0,289,49);
+ pixelText(ctx,touch?'TAP TO OPEN PHOSPHOR':'CLICK TO OPEN PHOSPHOR',144.5,17,3,1,'center');
+ ctx.globalCompositeOperation='source-in';ctx.fillStyle='#66ff84';ctx.fillRect(0,0,289,49);ctx.globalCompositeOperation='source-over';
 }

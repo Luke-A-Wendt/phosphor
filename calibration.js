@@ -16,5 +16,5 @@ export function drawCalibration(ctx,time,pattern=0,touch=false){
  }else{
   for(let i=0;i<4;i++){const y=49+i*27,x=15+(time*(18+i*24))%221;fill(16,y+10,224,1,25);fill(x,y,2,20,235);pixelText(ctx,String(18+i*24)+' PX/S',20,y-7,1,.35);}
  }
- pixelText(ctx,touch?'BUTTON NEXT TEST / ESC BACK':'SPACE NEXT TEST / ESC BACK',128,179,1,.45,'center');
+ pixelText(ctx,'ENTER NEXT TEST / ESC BACK',128,179,1,.45,'center');
 }

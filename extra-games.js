@@ -1,8 +1,8 @@
 /* Original minimal homages, drawn into the same 256 × 192 monochrome raster. */
 export const EXTRA_GAME_INFO=[
- {id:'snake',name:'Snake',description:'One growing line. Leave room to turn.',controls:'ARROWS MOVE / SPACE BOOST'},
- {id:'lander',name:'Lunar Lander',description:'A little thrust. A gentle landing.',controls:'LEFT RIGHT TILT / SPACE THRUST'},
- {id:'tanks',name:'Scorched Tanks',description:'One hill. Two tanks. Make your shot count.',controls:'LEFT RIGHT AIM / UP DOWN POWER / SPACE FIRE'}
+ {id:'snake',name:'Snake',description:'One growing line. Leave room to turn.',controls:'ARROWS MOVE / ENTER BOOST'},
+ {id:'lander',name:'Lander',description:'A little thrust. A gentle landing.',controls:'LEFT RIGHT TILT / ENTER THRUST'},
+ {id:'tanks',name:'Tanks',description:'One hill. Two tanks. Make your shot count.',controls:'LEFT RIGHT AIM / UP DOWN POWER / ENTER FIRE'}
 ];
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const rnd=(a,b)=>a+Math.random()*(b-a);
@@ -21,7 +21,7 @@ function line(c,x0,y0,x1,y1,v=1){
 }
 function clear(c){c.fillStyle='#000';c.fillRect(0,0,256,192);}
 function hud(c,left,right,text){text(c,left,14,9,1,.85);text(c,right,242,9,1,.85,'right');rect(c,14,19,228,1,.17);}
-function overlay(c,title,sub='PRESS SPACE',extra='',text){
+function overlay(c,title,sub='PRESS ENTER',extra='',text){
  rect(c,34,70,188,49,0);rect(c,34,70,188,1,.35);rect(c,34,118,188,1,.35);
  text(c,title,128,80,1,1,'center');text(c,sub,128,94,1,.7,'center');if(extra)text(c,extra,128,107,1,.4,'center');
 }
@@ -29,7 +29,7 @@ class Base{
  constructor(id,text){this.id=id;this.text=text;this.status='ready';this._score=0;this.time=0;}
  get score(){return this._score;}
  startGate(dt,input){this.time+=dt;if(['ready','over','won'].includes(this.status)){if(hit(input,'Space')){if(this.status!=='ready')this.restart();this.status='playing';this.onStart?.();input.sound?.('start');}return true;}return false;}
- terminalOverlay(c,title){if(this.status==='ready')overlay(c,title,'PRESS SPACE','ESC BACK',this.text);else if(this.status==='over')overlay(c,'GAME OVER','SPACE TO RESTART','',this.text);else if(this.status==='won')overlay(c,'YOU WIN','SPACE TO RESTART','',this.text);}
+ terminalOverlay(c,title){if(this.status==='ready')overlay(c,title,'PRESS ENTER','ESC BACK',this.text);else if(this.status==='over')overlay(c,'GAME OVER','ENTER TO RESTART','',this.text);else if(this.status==='won')overlay(c,'YOU WIN','ENTER TO RESTART','',this.text);}
 }
 
 class Snake extends Base{
@@ -61,7 +61,7 @@ class Snake extends Base{
   const head=this.body[0],x=14+head.x*6,y=29+head.y*6;
   if(this.dir.x){rect(c,x+(this.dir.x>0?3:1),y+1,1,1,.12);rect(c,x+(this.dir.x>0?3:1),y+3,1,1,.12);}else{rect(c,x+1,y+(this.dir.y>0?3:1),1,1,.12);rect(c,x+3,y+(this.dir.y>0?3:1),1,1,.12);}
   if(this.food){const fx=14+this.food.x*6,fy=29+this.food.y*6;rect(c,fx+1,fy+1,3,3,.9);rect(c,fx+2,fy,1,1,.45);rect(c,fx,fy+2,1,1,.45);rect(c,fx+4,fy+2,1,1,.45);rect(c,fx+2,fy+4,1,1,.45);}
-  this.text(c,'ARROWS MOVE / SPACE BOOST',128,181,1,.42,'center');this.terminalOverlay(c,'SNAKE');
+  this.text(c,'ARROWS MOVE / ENTER BOOST',128,181,1,.42,'center');this.terminalOverlay(c,'SNAKE');
  }
 }
 
@@ -113,7 +113,7 @@ class Lander extends Base {
   }
  }
  render(c){
-  clear(c);hud(c,'LUNAR LANDER',String(this._score).padStart(6,'0'),this.text);
+  clear(c);hud(c,'LANDER',String(this._score).padStart(6,'0'),this.text);
   this.text(c,'FUEL '+Math.ceil(this.ship.fuel),16,27,1,.5);rect(c,16,35,48,1,.16);rect(c,16,35,48*this.ship.fuel/100,1,.65);
   this.text(c,'V '+Math.abs(this.ship.vy).toFixed(1)+' H '+Math.abs(this.ship.vx).toFixed(1),240,27,1,.55,'right');
   this.text(c,'LIVES '+this.lives,16,43,1,.35);this.text(c,'LAND V<13 H<8',240,38,1,.3,'right');
@@ -129,10 +129,10 @@ class Lander extends Base {
   }else if(this.crashPoint){
    for(let n=0;n<9;n++){const a=n*Math.PI*2/9,r=7+(n%3)*2;line(c,clamp(this.crashPoint.x+Math.cos(a)*4,8,247),clamp(this.crashPoint.y+Math.sin(a)*4,24,176),clamp(this.crashPoint.x+Math.cos(a)*r,8,247),clamp(this.crashPoint.y+Math.sin(a)*r,24,176),.6);}
   }
-  this.text(c,'LEFT RIGHT TURN / SPACE THRUST',128,183,1,.4,'center');
-  if(this.phase==='landed')overlay(c,'SOFT LANDING','SPACE NEXT LANDING','FUEL BONUS AWARDED',this.text);
-  else if(this.phase==='crashed'&&this.status==='playing')overlay(c,'HARD LANDING','SPACE RETRY','KEEP LEVEL AND SLOW',this.text);
-  this.terminalOverlay(c,'LUNAR LANDER');
+  this.text(c,'LEFT RIGHT TURN / ENTER THRUST',128,183,1,.4,'center');
+  if(this.phase==='landed')overlay(c,'SOFT LANDING','ENTER NEXT LANDING','FUEL BONUS AWARDED',this.text);
+  else if(this.phase==='crashed'&&this.status==='playing')overlay(c,'HARD LANDING','ENTER RETRY','KEEP LEVEL AND SLOW',this.text);
+  this.terminalOverlay(c,'LANDER');
  }
 }
 
@@ -140,7 +140,7 @@ class Tanks extends Base {
  constructor(text){super('tanks',text);this.restart();}
  restart(){
   this.status='ready';this._score=0;this.time=0;this.turn=0;this.round=1;this.angle=50;this.power=62;
-  this.wind=rnd(-3,3);this.gravity=22;this.shot=null;this.blast=null;this.wait=0;this.aiDelay=0;this.trail=[];
+  this.wind=rnd(-3,3);this.gravity=22;this.shot=null;this.blast=null;this.wait=0;this.aiDelay=0;this.trail=[];this.aiShots=0;this.aiObservation=null;this.aiAim=null;
   const phase=rnd(0,Math.PI*2);
   this.terrain=Array.from({length:256},(_,x)=>Math.round(149+Math.sin(x*.026+phase)*12+Math.sin(x*.071+phase*.7)*5));
   this.tanks=[{x:30,y:0,hp:100,angle:50,power:62},{x:225,y:0,hp:100,angle:52,power:62}];
@@ -153,9 +153,10 @@ class Tanks extends Base {
   if(this.shot||this.wait>0||this.status!=='playing')return false;
   const origin=this.muzzle(side,angle),velocity=this.velocity(angle,power,side);
   this.tanks[side].angle=angle;this.tanks[side].power=power;
+  if(side===1){this.aiShots++;this.aiAim={angle,power,wind:this.wind};}
   this.shot={...origin,...velocity,side,age:0};this.trail=[];return true;
  }
- // Both the live shell and the computer's aim use the same acceleration and terrain.
+ // Shared live-shell integration also lets tests inspect a proposed trajectory.
  stepShell(shell,dt){
   const oldX=shell.x,oldY=shell.y;
   shell.x+=shell.vx*dt+.5*this.wind*dt*dt;shell.y+=shell.vy*dt+.5*this.gravity*dt*dt;
@@ -178,15 +179,33 @@ class Tanks extends Base {
   return {miss:true,x:shell.x,y:shell.y};
  }
  chooseAim(){
-  const target=this.tanks[0];let best={distance:Infinity,angle:50,power:62};
-  for(let angle=26;angle<=76;angle+=5)for(let power=35;power<=95;power+=3){
-   const hit=this.predict(angle,power);if(hit.miss)continue;
-   const distance=Math.hypot(hit.x-target.x,hit.y-(target.y-3));if(distance<best.distance)best={distance,angle,power};
+  const target=this.tanks[0],observation=this.aiObservation;
+  if(observation){
+   // Range the next shot from the last actual landing. Positive x error means
+   // the leftward shot fell short; account for wind changes since that shot.
+   const range=Math.max(35,this.tanks[1].x-observation.x);
+   const windDrift=.5*(this.wind-observation.wind)*observation.flight**2;
+   const error=observation.x-target.x+windDrift;
+   const correction=clamp(error*observation.power/(2*range),-12,12);
+   const spread=this.aiShots===1?2.1:1.2;
+   return {angle:observation.angle,power:clamp(observation.power+correction+rnd(-spread,spread),15,100)};
   }
-  return {angle:clamp(best.angle+rnd(-2.1,2.1),10,80),power:clamp(best.power+rnd(-2.8,2.8),15,100)};
+  // The opening shot estimates an arc but has an uncertain range. It usually
+  // needs calibration, can occasionally hit, and does not search the terrain
+  // for a perfect answer. Only a real completed shot improves that estimate.
+  const angle=rnd(50,64),a=angle*Math.PI/180,origin=this.muzzle(1,angle);
+  const range=Math.max(40,origin.x-target.x+rnd(-42,42));
+  const drop=target.y-3-origin.y;
+  const flight=Math.sqrt(Math.max(.1,2*(drop+range*Math.tan(a))/(this.gravity-this.wind*Math.tan(a))));
+  const speed=(range+.5*this.wind*flight*flight)/(Math.cos(a)*flight);
+  return {angle,power:clamp(speed/1.12,15,100)};
+ }
+ observeAim(x){
+  if(this.shot?.side!==1||!this.aiAim)return;
+  this.aiObservation={...this.aiAim,x,flight:this.shot.age};
  }
  impact(x,y,direct=-1){
-  const owner=this.shot?.side??this.turn;
+  const owner=this.shot?.side??this.turn;this.observeAim(x);
   for(let side=0;side<2;side++){
    const tank=this.tanks[side],distance=Math.hypot(tank.x-x,tank.y-3-y);
    const damage=side===direct?80:Math.round(70*Math.max(0,1-distance/24));
@@ -201,7 +220,7 @@ class Tanks extends Base {
   this.blast={x,y,age:0,radius};this.shot=null;this.wait=.8;
   if(this.tanks[0].hp<=0)this.status='over';else if(this.tanks[1].hp<=0){this.status='won';this._score+=150;}
  }
- endMiss(){this.shot=null;this.wait=.5;}
+ endMiss(){this.observeAim(this.shot?.x??this.tanks[1].x);this.shot=null;this.wait=.5;}
  update(dt,i){
   if(this.startGate(dt,i))return;
   if(this.blast){this.blast.age+=dt;if(this.blast.age>.65)this.blast=null;}
@@ -222,7 +241,7 @@ class Tanks extends Base {
   if(hit(i,'Space')&&this.fire(0,this.angle,this.power))i.sound?.('shoot');
  }
  render(c){
-  clear(c);hud(c,'SCORCHED TANKS',String(this._score).padStart(5,'0'),this.text);
+  clear(c);hud(c,'TANKS',String(this._score).padStart(5,'0'),this.text);
   this.text(c,'YOU '+this.tanks[0].hp,16,27,1,.8);this.text(c,'CPU '+this.tanks[1].hp,240,27,1,.55,'right');
   this.text(c,'WIND '+(this.wind<0?'< ':'> ')+Math.abs(this.wind).toFixed(1),128,27,1,.35,'center');
   for(let x=8;x<248;x++){
@@ -242,8 +261,8 @@ class Tanks extends Base {
   this.text(c,'AIM '+Math.round(this.angle),16,43,1,.6);this.text(c,'POWER '+Math.round(this.power),240,43,1,.6,'right');
   const caption=this.shot?'SHELL IN FLIGHT':this.wait>0?'':this.turn===0?'LEFT RIGHT AIM / UP DOWN POWER':'COMPUTER AIMING';
   this.text(c,caption,128,174,1,.45,'center');
-  this.text(c,this.turn===0&&!this.shot&&this.wait<=0?'SPACE FIRE':'ROUND '+this.round,128,183,1,.32,'center');
-  this.terminalOverlay(c,'SCORCHED TANKS');
+  this.text(c,this.turn===0&&!this.shot&&this.wait<=0?'ENTER FIRE':'ROUND '+this.round,128,183,1,.32,'center');
+  this.terminalOverlay(c,'TANKS');
  }
 }
 

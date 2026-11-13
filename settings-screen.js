@@ -14,6 +14,11 @@ const ROWS=[
  {key:'curvature',label:'CURVATURE',note:'CURVED SCREEN GEOMETRY'},
  {key:'glass',label:'GLASS DEPTH',note:'GLASS THICKNESS AND REFRACTION'},
  {key:'reducedMotion',label:'STABLE DISPLAY',note:'REDUCES RASTER FLUCTUATION',type:'boolean'},
+ {key:'musicVolume',label:'MUSIC',note:'GAME MUSIC / ZERO MUTES',max:1},
+ {key:'gameVolume',label:'GAME SOUNDS',note:'GAME EFFECTS / ZERO MUTES',max:1},
+ {key:'keyboardVolume',label:'KEYBOARD',note:'KEY DEPRESSIONS / ZERO MUTES',max:1},
+ {key:'monitorVolume',label:'MONITOR',note:'CRT POWER AND HUM / ZERO MUTES',max:1},
+ {key:'tint',label:'TINT',note:'MONOCHROME HUE / GREEN 125 DEG',max:360,step:5},
  {key:'test',label:'DISPLAY TEST',note:'GRID / FOCUS / MOTION',type:'action'},
  {key:'reset',label:'RESET SETTINGS',note:'RESTORE THE DEFAULT DISPLAY',type:'action'}
 ];
@@ -41,6 +46,7 @@ export class SettingsScreen {
   if(row.type==='environment')return ENVIRONMENT_LABELS[this.options.environment];
   if(row.type==='boolean')return this.options[row.key]?'ON':'OFF';
   if(row.type==='action')return '>';
+  if(row.key==='tint')return Math.round(this.options.tint)+' DEG';
   return Math.round(this.options[row.key]*100)+'%';
  }
  change(next){this.options=normalizeSettings(next);this.onChange({...this.options});}
@@ -50,7 +56,7 @@ export class SettingsScreen {
   const next={...this.options};
   if(row.type==='environment')next.environment=ENVIRONMENTS[(ENVIRONMENTS.indexOf(next.environment)+direction+ENVIRONMENTS.length)%ENVIRONMENTS.length];
   else if(row.type==='boolean')next[row.key]=direction>0;
-  else next[row.key]=clamp(Math.round((next[row.key]+direction*.05)*100)/100,row.key==='brightness'?.3:0,2);
+  else next[row.key]=clamp(Math.round((next[row.key]+direction*(row.step??.05))*100)/100,row.key==='brightness'?.3:0,row.max??2);
   if(next[row.key]!==this.options[row.key])this.change(next);
  }
  activate(){
@@ -74,15 +80,16 @@ export class SettingsScreen {
  }
  render(ctx,touch=false){
   fill(ctx,0,0,256,192,0);
-  pixelText(ctx,'DISPLAY SETTINGS',128,18,2,.9,'center');
+  pixelText(ctx,'SETTINGS',128,18,2,.9,'center');
   fill(ctx,18,35,220,1,.2);
   for(let slot=0;slot<7;slot++){
    const rowIndex=this.top+slot,row=ROWS[rowIndex],y=46+slot*14,selected=rowIndex===this.index;
    if(selected){fill(ctx,17,y-4,219,13,.065);pixelText(ctx,'>',21,y,1,.9);}
    pixelText(ctx,row.label,29,y,1,selected?.94:.4);
    if(!row.type){
-    const min=row.key==='brightness'?.3:0,amount=(this.options[row.key]-min)/(2-min);
-    fill(ctx,137,y+1,51,3,.12);fill(ctx,137,y+1,Math.round(51*amount),3,selected?.65:.28);
+    const min=row.key==='brightness'?.3:0,amount=(this.options[row.key]-min)/((row.max??2)-min);
+    const width=row.key==='tint'?40:51;
+    fill(ctx,137,y+1,width,3,.12);fill(ctx,137,y+1,Math.round(width*amount),3,selected?.65:.28);
    }
    pixelText(ctx,this.valueLabel(row),228,y,1,selected?.94:.5,'right');
   }
@@ -92,6 +99,6 @@ export class SettingsScreen {
   fill(ctx,18,145,220,1,.2);
   pixelText(ctx,ROWS[this.index].note,128,154,1,.43,'center');
   pixelText(ctx,'UP DOWN SELECT / LEFT RIGHT ADJUST',128,168,1,.35,'center');
-  pixelText(ctx,touch?'BUTTON SELECT / ESC BACK':'SPACE SELECT / ESC BACK',128,179,1,.5,'center');
+  pixelText(ctx,'ENTER SELECT / ESC BACK',128,179,1,.5,'center');
  }
 }

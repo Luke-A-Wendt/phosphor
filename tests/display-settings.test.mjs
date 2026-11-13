@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {DISPLAY_DEFAULTS,ENVIRONMENTS,normalizeSettings} from '../display-settings.js';
 import {TEST_PATTERNS,drawCalibration} from '../calibration.js';
+import {phosphorColors,colorCSS} from '../phosphor-color.js';
 
 const numericKeys=['brightness','persistence','bloom','scanlines','curvature','glass','ambient','reflection'];
 
@@ -13,7 +14,7 @@ test('missing or invalid stored settings fall back to independent usable default
     assert.equal(result.environment,'diffuse');
   }
   const copy=normalizeSettings();copy.brightness=0;copy.environment='none';
-  assert.equal(normalizeSettings().brightness,1.08);
+  assert.equal(normalizeSettings().brightness,1.73);
   assert.equal(normalizeSettings().environment,'diffuse');
 });
 
@@ -55,4 +56,39 @@ test('each calibration pattern draws a finite monochrome landscape raster',()=>{
       drawCalibration(ctx,time,pattern);assert.ok(draws>100);
     }
   }
+});
+
+
+test('sound defaults are full volume and all sound values clamp independently to zero through one',()=>{
+ const expected={musicVolume:1,gameVolume:1,keyboardVolume:1,monitorVolume:1};
+ for(const [key,value] of Object.entries(expected)){
+  assert.equal(normalizeSettings()[key],value);
+  assert.equal(normalizeSettings({[key]:-1})[key],0);
+  assert.equal(normalizeSettings({[key]:5})[key],1);
+  for(const invalid of [NaN,Infinity,'0.5',null])assert.equal(normalizeSettings({[key]:invalid})[key],value);
+ }
+ const copied=normalizeSettings(expected);copied.musicVolume=0;assert.equal(DISPLAY_DEFAULTS.musicVolume,1);
+ const mixed=normalizeSettings({musicVolume:0,gameVolume:.8,keyboardVolume:0,monitorVolume:.1,brightness:1.73});
+ assert.equal(mixed.musicVolume,0);assert.equal(mixed.gameVolume,.8);assert.equal(mixed.keyboardVolume,0);assert.equal(mixed.monitorVolume,.1);assert.equal(mixed.brightness,1.73);
+});
+
+test('tint is bounded across the complete hue wheel and invalid values restore the original green',()=>{
+ assert.equal(DISPLAY_DEFAULTS.tint,125);
+ assert.equal(normalizeSettings({tint:-50}).tint,0);
+ assert.equal(normalizeSettings({tint:500}).tint,360);
+ for(const invalid of [NaN,Infinity,-Infinity,'240',null])assert.equal(normalizeSettings({tint:invalid}).tint,125);
+ assert.equal(normalizeSettings(JSON.parse(JSON.stringify({tint:240}))).tint,240);
+ const green=phosphorColors(125);
+ assert.deepEqual(green.spectrum,[.035,1,.115]);assert.deepEqual(green.glass,[.20,.72,.30]);assert.deepEqual(green.coating,[.10,.70,.24]);
+ assert.deepEqual(green.beam,[37,229,92]);assert.deepEqual(green.room,[55,90,62]);assert.deepEqual(green.page,[3,7,5]);
+ assert.equal(colorCSS(green.beam),'rgba(37,229,92,1)');
+ for(const [hue,channel] of [[0,0],[120,1],[240,2]]){
+  const color=phosphorColors(hue).spectrum;assert.equal(color[channel],Math.max(...color));assert.ok(color[channel]>.95);
+ }
+ for(let hue=0;hue<=360;hue+=5){
+  const colors=phosphorColors(hue);
+  for(const key of ['spectrum','glass','coating'])assert.ok(colors[key].every(v=>Number.isFinite(v)&&v>=0&&v<=1));
+  for(const key of ['beam','line','core','spot','ambient','room','page'])assert.ok(colors[key].every(v=>Number.isFinite(v)&&v>=0&&v<=255));
+ }
+ assert.deepEqual(phosphorColors(0),phosphorColors(360));
 });
