@@ -1,7 +1,7 @@
 /**
  * Monochrome raster / faceplate renderer. No dependencies.
  *
- * The source is exactly 160 x 192 samples, displayed with non-square pixels.
+ * The source is exactly 256 x 192 samples, displayed at 4:3 with square pixels.
  * A 60 Hz / 262-line raster excites two exponential phosphor populations.
  * Each visible frame analytically integrates decay AND the line's excitation
  * pulses over its exposure interval; there is no decorative scrolling scan bar.
@@ -10,7 +10,7 @@
  * rendered at display resolution. No RGB mask is used on a monochrome tube.
  *
  * This is a physically informed, tunable visual model, not a measured model of
- * one particular tube. Faceplate refraction is a thin-layer approximation;
+ * one particular tube. The faceplate uses geometric-optics rays through finite-thickness spherical glass;
  * room reflections are procedural. Browser refresh cannot show the individual
  * 15.72 kHz sweeps. Fast/slow decay constants are illustrative green phosphor.
  */
@@ -42,7 +42,7 @@ void main(){
   float line=191.0-float(cell.y);
   // The active portion occupies 83% of each line; the remaining time is
   // horizontal blanking/retrace. Vertical blanking is never phosphor-excited.
-  float phase=(35.0+line+0.13+0.83*(float(cell.x)+0.5)/160.0)/262.0*period;
+  float phase=(35.0+line+0.13+0.83*(float(cell.x)+0.5)/256.0)/262.0*period;
   vec2 tau=vec2(0.0017,0.025)*max(0.08,persistence);
   float start=clock-exposure;
   float pulse=(floor((start-phase)/period)+1.0)*period+phase;
@@ -75,11 +75,11 @@ uniform float scanlines;
 uniform float brightness;
 out vec4 color;
 float signalAt(ivec2 p){
-  if(p.x<0||p.x>=160||p.y<0||p.y>=192) return 0.0;
+  if(p.x<0||p.x>=256||p.y<0||p.y>=192) return 0.0;
   return texelFetch(state,p,0).b;
 }
 void main(){
-  vec2 position=uv*vec2(160.0,192.0)-0.5;
+  vec2 position=uv*vec2(256.0,192.0)-0.5;
   ivec2 base=ivec2(floor(position));
   float light=0.0;
   float edge=pow(length((uv-0.5)*1.42),3.0);
@@ -132,74 +132,169 @@ uniform float curvature;
 uniform float glass;
 uniform float bloom;
 uniform float motion;
+uniform float ambient;
+uniform float reflection;
+uniform float environmentMode;
 uniform vec2 resolution;
 out vec4 color;
-float hash(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
-float roundedBox(vec2 p,vec2 b,float r){vec2 q=abs(p)-b+r; return length(max(q,0.0))+min(max(q.x,q.y),0.0)-r;}
-float rectangle(vec2 p,vec2 lo,vec2 hi,float softness){
-  vec2 a=smoothstep(lo-vec2(softness),lo+vec2(softness),p);
-  vec2 b=1.0-smoothstep(hi-vec2(softness),hi+vec2(softness),p);
-  return a.x*a.y*b.x*b.y;
+
+// All geometry is in screen-half-height units. The normal-incidence faceplate
+// thickness is about 5% of its height: illustrative thick CRT glass, not a
+// measured tube. Ray intersections and Fresnel use physical geometric optics;
+// the environment, coating texture and unresolved scattering are approximations.
+float hash(vec2 p){vec3 q=fract(vec3(p.xyx)*0.1031);q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.0-2.0*f);return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1)),f.x),f.y);}
+float roundedBox(vec2 p,vec2 b,float r){vec2 q=abs(p)-b+r;return length(max(q,0.0))+min(max(q.x,q.y),0.0)-r;}
+// Nearest forward intersection, including a ray starting within a sphere.
+float sphereHit(vec3 origin,vec3 direction,vec3 center,float radius){
+  vec3 offset=origin-center;float b=dot(offset,direction);
+  float h=b*b-dot(offset,offset)+radius*radius;
+  if(h<0.0)return -1.0;
+  float root=sqrt(h),nearHit=-b-root,farHit=-b+root;
+  return nearHit>0.00001?nearHit:farHit;
 }
-vec3 phosphor(float energy){
-  // All emission shares one green spectrum. The transfer curve retains a
-  // bright green core rather than clipping it to white.
-  float g=1.0-exp(-max(energy,0.0)*0.85);
-  return vec3(pow(g,1.10)*0.135,g,pow(g,1.16)*0.31);
+// Unpolarized dielectric Fresnel: squared s/p amplitude average. Exact rather
+// than Schlick, including total internal reflection for the inner interface.
+float fresnel(float cosI,float etaI,float etaT){
+  cosI=clamp(abs(cosI),0.0,1.0);
+  float sinT2=(etaI*etaI)/(etaT*etaT)*(1.0-cosI*cosI);
+  if(sinT2>=1.0)return 1.0;
+  float cosT=sqrt(1.0-sinT2);
+  float rs=(etaI*cosI-etaT*cosT)/(etaI*cosI+etaT*cosT);
+  float rp=(etaT*cosI-etaI*cosT)/(etaT*cosI+etaI*cosT);
+  return (rs*rs+rp*rp)*0.5;
+}
+// A deliberately unresolved environment: broad radiance fields rather than
+// identifiable objects. Reflected rays still sample their own direction, so
+// the illumination follows the curved front and rear interfaces separately.
+float softLobe(vec2 p,vec2 center,vec2 size){vec2 d=(p-center)/size;return exp(-dot(d,d)*0.5);}
+float environmentLight(vec3 point,vec3 direction,float roughness){
+  float distance=(4.0-point.z)/max(direction.z,0.12);
+  vec2 room=point.xy+direction.xy*distance;
+  vec2 blur=vec2(roughness*2.0);
+  float broad=0.022+0.032*softLobe(room,vec2(-1.8,2.7),vec2(4.9,3.8)+blur);
+  float irregular=0.84+0.16*noise(room*0.28+vec2(9.0,4.0));
+  float diffuse=broad+0.045*softLobe(room,vec2(3.6,0.7),vec2(3.1,4.8)+blur);
+  // A very soft window-lit wall; no rectangular edges, mullions or grid.
+  float window=broad+0.17*softLobe(room,vec2(-3.2,2.0),vec2(2.7,3.4)+blur)
+                    +0.023*softLobe(room,vec2(4.7,-2.0),vec2(4.4,3.2)+blur);
+  float studio=broad+0.10*softLobe(room,vec2(-1.2,4.9),vec2(5.1,1.8)+blur)
+                    +0.075*softLobe(room,vec2(4.0,1.5),vec2(2.1,3.6)+blur)
+                    +0.018*softLobe(room,vec2(-4.8,-1.6),vec2(3.0,2.7)+blur);
+  // An observer softly occludes an illuminated room. The head/shoulders are
+  // a dim negative reflection, never a luminous avatar, camera or live image.
+  float head=softLobe(room,vec2(0.2,0.70),vec2(0.58,0.78)+blur*0.5);
+  float shoulders=softLobe(room,vec2(0.2,-1.35),vec2(1.65,0.91)+blur*0.5);
+  float observerMask=clamp(max(head,shoulders),0.0,1.0);
+  float observer=(diffuse+0.032)*(1.0-observerMask*0.32);
+  float value=diffuse;
+  if(environmentMode>1.5&&environmentMode<2.5)value=window;
+  else if(environmentMode>2.5&&environmentMode<3.5)value=studio;
+  else if(environmentMode>3.5&&environmentMode<4.5)value=observer;
+  else if(environmentMode>4.5)value=(window*0.38+studio*0.32+diffuse*0.30)*(1.0-observerMask*0.16);
+  return value*irregular;
+}
+float scratch(vec2 point,vec2 a,vec2 b,float width){
+  vec2 ab=b-a;float t=clamp(dot(point-a,ab)/dot(ab,ab),0.0,1.0);
+  float d=length(point-a-ab*t);return exp(-d*d/(width*width));
+}
+vec3 encodeDisplay(vec3 light){
+  // Work in linear light until this final exposure/tone response. An sRGB
+  // display cannot emit a real phosphor spectrum or an electron-beam impulse.
+  vec3 mapped=vec3(1.0)-exp(-max(light,vec3(0))*1.10);
+  return mix(12.92*mapped,1.055*pow(mapped,vec3(1.0/2.4))-0.055,step(vec3(0.0031308),mapped));
 }
 void main(){
-  vec2 p=uv*2.0-1.0;
-  float c=clamp(curvature,0.0,2.0);
-  vec2 shaped=p*(1.0+0.055*c*dot(p,p));
-  float edgeDistance=roundedBox(shaped,vec2(0.988),0.095+0.035*c);
-  float aa=2.4/max(resolution.x,resolution.y);
-  float inside=1.0-smoothstep(-aa,aa,edgeDistance);
+  const vec2 aspect=vec2(4.0/3.0,1.0);
+  vec2 p=(uv*2.0-1.0)*aspect;
   vec3 page=vec3(3.0,7.0,5.0)/255.0;
-  // Convex outer faceplate and refraction down to the emitting inner surface.
-  vec3 normal=normalize(vec3(p.x*0.30*c,p.y*0.24*c,1.0));
-  vec3 transmitted=refract(vec3(0.0,0.0,-1.0),normal,1.0/1.52);
-  vec2 refracted=shaped+glass*0.042*transmitted.xy/max(0.1,-transmitted.z);
-  vec2 screen=refracted*0.5+0.5;
-  float direct=texture(beam,screen).r;
-  float tight=texture(glow,screen).r;
-  float wide=texture(scatter,screen).r;
-  // Very faint second-surface reflection: displaced with angle, not a second
-  // equally bright text image. This is an approximation of internal halation.
-  float ghost=texture(glow,screen+normal.xy*0.011).r;
-  float transmission=1.0-glass*(0.045+0.045*dot(p,p));
-  float edgeFocus=1.0-0.12*pow(clamp(dot(p,p)*0.5,0.0,1.0),2.0);
-  // Scatter redistributes light instead of adding unlimited energy. The
-  // normalized kernels and these coefficients preserve total emitted flux
-  // before glass attenuation, edge loss, and the display transfer curve.
-  float tightWeight=0.20*bloom, wideWeight=0.12*bloom;
-  float ghostWeight=0.012*glass;
-  float directWeight=1.0-tightWeight-wideWeight-ghostWeight;
-  float energy=(direct*directWeight+tight*tightWeight+wide*wideWeight+ghost*ghostWeight)*transmission*edgeFocus;
-  float granularity=(hash(floor(screen*vec2(1280.0,1536.0)))-0.5)*0.035;
-  energy*=1.0+granularity;
-  // Thermal/electrical variation is intentionally tiny. No simulated VHS
-  // tracking faults, RGB convergence error, or cinematic rolling bright bar.
-  float noise=(hash(gl_FragCoord.xy+floor(clock*60.0))-0.5)*motion;
-  energy*=1.0+noise*0.009;
-  vec3 light=phosphor(energy);
-  float fresnel=0.042+0.958*pow(1.0-max(normal.z,0.0),5.0);
-  // A dim off-screen window reflected in the curved faceplate. Position and
-  // shape follow the surface normal, giving it a separate visual depth.
-  vec2 reflected=vec2(p.x+0.10*p.y*p.y,p.y-0.16*p.x*p.x);
-  float window=rectangle(reflected,vec2(-0.84,0.48),vec2(-0.40,0.91),0.10);
-  float cross=1.0-0.68*exp(-pow((reflected.x+0.625)/0.022,2.0));
-  window*=cross;
-  float lip=exp(-pow((edgeDistance+0.018)/0.009,2.0));
-  float rim=lip*(0.25+0.75*max(0.0,p.y))*0.009;
-  float reflection=glass*(window*(0.014+fresnel*0.12)+rim);
-  // Glass has its own barely visible, green-tinted ambient floor.
-  vec3 surface=vec3(0.004,0.010,0.006)+reflection*vec3(0.21,1.0,0.47);
-  surface+=light;
-  // A small amount of optical spill reaches outside the active faceplate,
-  // with no housing, frame, bezel, or outer monitor representation.
-  float spill=(1.0-inside)*exp(-max(0.0,edgeDistance)*80.0)*texture(scatter,clamp(screen,0.0,1.0)).r*bloom*0.025;
-  vec3 result=mix(page,surface,inside)+phosphor(spill);
-  color=vec4(result,1.0);
+  float c=clamp(curvature,0.0,2.0),g=clamp(glass,0.0,2.0);
+  float aa=max(0.0005,2.0/resolution.y);
+  float outerDistance=roundedBox(p,vec2(1.308,0.975),0.112);
+  float outerMask=1.0-smoothstep(-aa,aa,outerDistance);
+  // Avoid huge radii at zero curvature while retaining a virtually flat mode.
+  float outerRadius=max(1.95,3.15/max(0.04,c));
+  float thickness=0.095*max(g,0.025);
+  float innerRadius=outerRadius-thickness;
+  vec3 center=vec3(0,0,-outerRadius);
+  vec3 origin=vec3(p,3.0),incident=vec3(0,0,-1);
+  float outerT=sphereHit(origin,incident,center,outerRadius);
+  vec3 outerPoint=origin+incident*outerT;
+  vec3 outerNormal=normalize(outerPoint-center);
+  // Small fixed surface waviness bends reflected rays, independent of the
+  // separate phosphor grain underneath. No time-varying swimming glass.
+  float waviness=sin(p.x*9.7+p.y*5.3)*sin(p.y*11.4-p.x*3.1)*0.0008*g;
+  vec3 reflectionNormal=normalize(outerNormal+vec3(waviness,-waviness*0.7,0));
+  const float ior=1.52;
+  vec3 glassRay=refract(incident,outerNormal,1.0/ior);
+  float innerT=sphereHit(outerPoint+glassRay*0.0001,glassRay,center,innerRadius);
+  vec3 innerPoint=outerPoint+glassRay*(innerT+0.0001);
+  vec3 innerNormal=normalize(innerPoint-center);
+  float outerF=fresnel(dot(-incident,outerNormal),1.0,ior);
+  // Light originates in a coating at the rear glass boundary. Use the second
+  // interface for reciprocal transmission and the first internal ghost path.
+  float innerF=fresnel(dot(-glassRay,innerNormal),ior,1.0);
+  float opticalPath=max(innerT,0.0);
+  float transmission=(1.0-outerF)*(1.0-innerF)*exp(-0.70*opticalPath);
+  vec2 image=innerPoint.xy/vec2(2.56,1.92)+0.5;
+  float innerDistance=roundedBox(innerPoint.xy,vec2(1.280,0.960),0.098);
+  float phosphorMask=1.0-smoothstep(-aa,aa,innerDistance);
+
+  float direct=texture(beam,image).r;
+  float tight=texture(glow,image).r,wide=texture(scatter,image).r;
+  // Approximate one extra internal round trip. Both its angular displacement
+  // and attenuation grow with the glass path. Higher bounces are discarded.
+  vec2 ghostShift=2.0*opticalPath*glassRay.xy/vec2(2.56,1.92);
+  float ghost=texture(glow,image+ghostShift).r;
+  float ghostFraction=outerF*innerF*exp(-1.4*opticalPath);
+  float tightWeight=clamp(bloom*0.19,0.0,0.38),wideWeight=clamp(bloom*0.14,0.0,0.28);
+  float energy=mix(direct,ghost,ghostFraction)*(1.0-tightWeight-wideWeight)+tight*tightWeight+wide*wideWeight;
+
+  // Fixed inner-surface phosphor grains: granular conversion efficiency, low-
+  // frequency coating mottling, and tiny ambient reflectance. It is a coating,
+  // not a decorative RGB grille. Antialias the finest grain on small screens.
+  float grainScale=min(1152.0,resolution.y*0.85);
+  float grains=noise(image*vec2(grainScale*4.0/3.0,grainScale));
+  float coating=noise(image*vec2(43.0,31.0));
+  float conversion=0.90+0.18*grains+0.035*(coating-0.5);
+  float edgeFocus=1.0-0.075*pow(length(innerPoint.xy/aspect)*0.7071,3.0);
+  float electronicNoise=(hash(gl_FragCoord.xy+floor(clock*60.0))-0.5)*0.005*motion;
+  energy*=conversion*edgeFocus*(1.0+electronicNoise)*transmission*phosphorMask;
+
+  float roomLight=clamp(ambient,0.0,2.0);
+  float reflectionGain=roomLight*clamp(reflection,0.0,2.0)*step(0.5,environmentMode);
+  float reflected=environmentLight(outerPoint,reflect(incident,reflectionNormal),0.20)*outerF*g*reflectionGain;
+  // Reflection from the inner face has a distinct displaced surface image.
+  vec3 internalReflection=reflect(glassRay,innerNormal);
+  vec3 escapedReflection=refract(internalReflection,-outerNormal,ior);
+  if(dot(escapedReflection,escapedReflection)>0.01){
+    reflected+=environmentLight(innerPoint,escapedReflection,0.42)*innerF*(1.0-outerF)*(1.0-outerF)*exp(-1.4*opticalPath)*0.28*g*reflectionGain;
+  }
+  // Microscopic surface marks scatter reflected room light; the image below
+  // stays sharply separated from them. Effects intentionally remain sparse.
+  vec2 dustGrid=p*vec2(280.0);vec2 dustCell=floor(dustGrid);
+  float dustSeed=hash(dustCell);
+  float dust=step(0.9965,dustSeed)*exp(-28.0*dot(fract(dustGrid)-0.5,fract(dustGrid)-0.5));
+  float marks=scratch(p,vec2(-0.98,0.66),vec2(-0.73,0.74),max(aa*0.32,0.0008));
+  marks+=scratch(p,vec2(0.84,-0.72),vec2(0.97,-0.63),max(aa*0.25,0.0006))*0.5;
+  float grazing=pow(1.0-max(outerNormal.z,0.0),0.65);
+  reflected+=(dust*0.0016+marks*0.0008)*(0.3+grazing)*g*reflectionGain;
+  // The thin bright edge is the glass edge itself, not a monitor frame. The
+  // phosphor coating ends slightly behind it, visibly revealing depth.
+  float edgeGlint=exp(-pow((outerDistance+0.010)/0.005,2.0));
+  float topLight=0.25+0.75*smoothstep(-0.5,0.9,p.y);
+  reflected+=edgeGlint*topLight*0.003*g*reflectionGain;
+  float edgeDepth=(1.0-phosphorMask)*0.0007*g*roomLight;
+  // Ambient illumination reaches the matte coating through the faceplate.
+  // It raises black level independently of identifiable/specular reflections.
+  // At zero room light the coating and marks vanish; only emission remains.
+  float ambientCoating=(0.0020+grains*0.0015+coating*0.0008)*phosphorMask*roomLight*transmission;
+  vec3 phosphorSpectrum=vec3(0.035,1.0,0.115);
+  vec3 glassTint=vec3(0.20,0.72,0.30);
+  vec3 linearLight=energy*phosphorSpectrum+(reflected+edgeDepth)*glassTint+ambientCoating*vec3(0.10,0.70,0.24);
+  vec3 surface=encodeDisplay(linearLight);
+  float spill=(1.0-outerMask)*exp(-max(0.0,outerDistance)*95.0)*wide*bloom*0.008;
+  color=vec4(mix(page,surface,outerMask)+encodeDisplay(spill*phosphorSpectrum),1.0);
 }`;
 
 function shader(gl,type,source){
@@ -223,7 +318,7 @@ function program(gl,fragment){
 export class CRTDisplay {
   constructor(canvas,sourceCanvas){
     this.canvas=canvas; this.source=sourceCanvas;
-    this.options={brightness:1,persistence:1,bloom:1,curvature:1,glass:1,scanlines:1,reducedMotion:false};
+    this.options={brightness:1.08,persistence:1,bloom:1.15,curvature:1,glass:1.15,scanlines:1,ambient:0.35,reflection:0.45,environment:'diffuse',reducedMotion:false};
     this._backend='Canvas 2D fallback'; this._targets=[]; this._programs=[]; this._destroyed=false;
     this._contextLost=false; this._lostHandler=e=>{e.preventDefault();this._contextLost=true;this._backend='WebGL context lost';};
     this._restoreHandler=()=>{this._contextLost=false;this.gl=this.gl||this._blitGL;this._blitGL=null;try{this._initGL();this.resize();}catch(e){this._fallback(e);}};
@@ -248,9 +343,9 @@ export class CRTDisplay {
     this.inputTexture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,this.inputTexture);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,160,192,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
-    this.states=[this._target(160,192,false),this._target(160,192,false)]; this.stateIndex=0;
-    this._backend='WebGL 2 · integrated raster';this._forceResize=true;
+    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,256,192,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+    this.states=[this._target(256,192,false),this._target(256,192,false)]; this.stateIndex=0;
+    this._backend='WebGL 2 · layered glass / integrated raster';this._forceResize=true;
   }
   _target(width,height,linear=true){
     const gl=this.gl,texture=gl.createTexture(),fbo=gl.createFramebuffer();
@@ -310,20 +405,22 @@ void main(){color=texture(pixels,uv);}`);
     }
     this.fallback=ctx;this._forceResize=false;
     this._backend='Canvas 2D fallback · reduced optics';
-    this._fallbackBuffer=document.createElement('canvas');this._fallbackBuffer.width=160;this._fallbackBuffer.height=192;
+    this._fallbackBuffer=document.createElement('canvas');this._fallbackBuffer.width=256;this._fallbackBuffer.height=192;
     this._fallbackContext=this._fallbackBuffer.getContext('2d',{alpha:false});
   }
   setOptions(partial={}){
-    for(const key of ['brightness','persistence','bloom','curvature','glass','scanlines']){
+    for(const key of ['brightness','persistence','bloom','curvature','glass','scanlines','ambient','reflection']){
       if(Number.isFinite(partial[key]))this.options[key]=Math.max(0,Math.min(2,partial[key]));
     }
+    if(['none','diffuse','window','studio','observer','mixed'].includes(partial.environment))this.options.environment=partial.environment;
     if('reducedMotion' in partial)this.options.reducedMotion=Boolean(partial.reducedMotion);
   }
   resize(){
     const rect=this.canvas.getBoundingClientRect();
     const dpr=Math.min(2,window.devicePixelRatio||1);
     // A modest size cap keeps all multipass buffers affordable on integrated GPUs.
-    const scale=Math.min(dpr,1400/Math.max(1,rect.width));
+    const pixelBudget=window.matchMedia?.('(pointer: coarse)').matches?900000:1470000;
+    const scale=Math.min(dpr,1400/Math.max(1,rect.width),Math.sqrt(pixelBudget/Math.max(1,rect.width*rect.height)));
     const width=Math.max(4,Math.round((rect.width||800)*scale));
     const height=Math.max(4,Math.round((rect.height||600)*scale));
     if(this.canvas.width===width&&this.canvas.height===height&&!this._forceResize)return;
@@ -378,12 +475,12 @@ void main(){color=texture(pixels,uv);}`);
     this._pass(this.programs.blur,this.glowTarget,{image:this.blurHalf.texture},{direction:[0,2.0/h]});
     this._pass(this.programs.blur,this.blurQuarter,{image:this.glowTarget.texture},{direction:[9.0/w,0]});
     this._pass(this.programs.blur,this.scatterTarget,{image:this.blurQuarter.texture},{direction:[0,9.0/h]});
-    this._pass(this.programs.composite,null,{beam:this.beamTarget.texture,glow:this.glowTarget.texture,scatter:this.scatterTarget.texture},{clock:this._clock,curvature:o.curvature,glass:o.glass,bloom:o.bloom,motion:o.reducedMotion?0:1,resolution:[w,h]});
+    this._pass(this.programs.composite,null,{beam:this.beamTarget.texture,glow:this.glowTarget.texture,scatter:this.scatterTarget.texture},{clock:this._clock,curvature:o.curvature,glass:o.glass,bloom:o.bloom,motion:o.reducedMotion?0:1,ambient:o.ambient,reflection:o.reflection,environmentMode:['none','diffuse','window','studio','observer','mixed'].indexOf(o.environment),resolution:[w,h]});
   }
   _renderFallback(dt){
     const ctx=this.fallback;if(!ctx)return;
     const b=this._fallbackContext,o=this.options,w=this.canvas.width,h=this.canvas.height;
-    b.globalCompositeOperation='source-over';b.fillStyle=`rgba(0,0,0,${1-Math.exp(-dt/(0.022*Math.max(0.08,o.persistence)))})`;b.fillRect(0,0,160,192);
+    b.globalCompositeOperation='source-over';b.fillStyle=`rgba(0,0,0,${1-Math.exp(-dt/(0.022*Math.max(0.08,o.persistence)))})`;b.fillRect(0,0,256,192);
     b.globalCompositeOperation='lighter';b.globalAlpha=0.65;b.drawImage(this.source,0,0);b.globalAlpha=1;b.globalCompositeOperation='source-over';
     ctx.fillStyle='#030705';ctx.fillRect(0,0,w,h);ctx.save();
     const r=w*0.025;ctx.beginPath();ctx.roundRect(w*0.025,h*0.025,w*0.95,h*0.95,r);ctx.clip();
@@ -391,6 +488,37 @@ void main(){color=texture(pixels,uv);}`);
     ctx.filter='none';ctx.globalAlpha=Math.min(1,o.brightness);ctx.drawImage(this._fallbackBuffer,0,0,w,h);
     ctx.globalCompositeOperation='multiply';ctx.fillStyle='#25e55c';ctx.fillRect(0,0,w,h);ctx.globalCompositeOperation='source-over';ctx.globalAlpha=0.32*Math.min(1,o.scanlines);ctx.fillStyle='#000';
     for(let y=0;y<192;y++)ctx.fillRect(0,(y+0.65)*h/192,w,h/192*0.35);
+    ctx.globalAlpha=1;ctx.globalCompositeOperation='screen';
+    ctx.fillStyle=`rgba(11,30,16,${o.ambient*0.18})`;ctx.fillRect(0,0,w,h);
+    if(o.environment!=='none'&&o.ambient>0&&o.reflection>0){
+      // Cache a small unresolved room field. The fallback keeps all preset
+      // choices, while its documented reduced optics omit refracted rays.
+      if(this._roomPreset!==o.environment){
+        this._roomPreset=o.environment;
+        this._roomCanvas??=document.createElement('canvas');
+        this._roomCanvas.width=256;this._roomCanvas.height=192;
+        const room=this._roomCanvas.getContext('2d');
+        const lobe=(x,y,rx,ry,alpha)=>{
+          room.save();room.translate(x,y);room.scale(rx,ry);
+          const gradient=room.createRadialGradient(0,0,0,0,0,1);
+          gradient.addColorStop(0,`rgba(55,90,62,${alpha})`);
+          gradient.addColorStop(1,'rgba(0,0,0,0)');
+          room.fillStyle=gradient;room.fillRect(-1,-1,2,2);room.restore();
+        };
+        room.globalCompositeOperation='lighter';
+        lobe(100,65,230,175,.35);lobe(220,95,180,200,.25);
+        if(o.environment==='window'||o.environment==='mixed')lobe(30,48,180,190,.6);
+        if(o.environment==='studio'||o.environment==='mixed'){
+          lobe(180,8,180,105,.45);lobe(250,110,105,200,.25);
+        }
+        if(o.environment==='observer'||o.environment==='mixed'){
+          room.globalCompositeOperation='destination-out';
+          lobe(133,75,34,42,.22);lobe(133,139,84,50,.22);
+        }
+      }
+      ctx.globalAlpha=Math.min(.65,o.ambient*o.reflection*.18);
+      ctx.drawImage(this._roomCanvas,0,0,w,h);
+    }
     ctx.restore();ctx.filter='none';ctx.globalAlpha=1;
     if(this._blitGL){
       const gl=this._blitGL;gl.bindVertexArray(null);gl.useProgram(this._blitProgram.p);

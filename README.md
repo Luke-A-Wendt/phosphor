@@ -1,78 +1,123 @@
 # [PHOSPHORUS](https://luke-a-wendt.github.io/phosphorus/)
 
-Five small arcade games on a 160 × 192 monochrome green raster. No monitor housing, no textures or downloaded assets, no external dependencies, and no build step.
+Eight minimal arcade games behind curved green glass. **PHOSPHOR** draws its games, menus, settings, and calibration patterns into the same 256 × 192 monochrome raster.
 
-## Play
+## Open and play
 
-Choose Tetris, Pong, Breakout, Asteroids, or Space Invaders. Press **Space** or click **Start game**. Use **P** to pause, **R** to restart, **F** for fullscreen, and **1–5** to switch games. Arrow keys or WASD move. Touch controls appear on touch devices.
+The home page is black with one glowing **OPEN PHOSPHOR** button. Click it to enter fullscreen. Everything else is inside the monitor.
 
-| Game | Controls |
+Use **WASD or the arrow keys** for movement and **Space** as the action button. Select a game with up/down, then press Space. Press Space after a game ends to restart.
+
+| Game | Movement | Action button |
+| --- | --- | --- |
+| Tetris | Left/right move; up rotates; down lowers | Hard drop |
+| Pong | Up/down move the paddle | Serve |
+| Breakout | Left/right move the paddle | Launch |
+| Asteroids | Left/right turn; up thrusts | Fire; hold for repeated shots |
+| Space Invaders | Left/right move | Fire; hold for repeated shots |
+| Snake | Directions steer; reversing into yourself is blocked | Hold to move faster |
+| Lunar Lander | Left/right tilt; up also thrusts | Hold to thrust |
+| Scorched Tanks | Left/right aim; up/down adjust power | Fire |
+
+Snake grows as it eats. Lunar Lander requires a gentle, level landing with both feet on the pad; fuel and lives are limited. Scorched Tanks is a simplified turn-based artillery duel against the computer, with wind, destructible terrain, and blast damage.
+
+High scores stay in your browser. Losing focus pauses a game; the action button resumes it.
+
+## Back navigation
+
+The menu hint is **ESC BACK**. Escape and the mobile ESC button have the same behavior:
+
+| Current screen | One Escape goes to |
 | --- | --- |
-| Tetris | Left/right move, up or X rotate clockwise, Z counterclockwise, down soft drop, Space hard drop |
-| Pong | Up/down or pointer move the paddle; Space serves; first to seven wins |
-| Breakout | Left/right or pointer move the paddle; Space launches; three lives |
-| Asteroids | Left/right rotate, up thrust, hold Space to fire |
-| Space Invaders | Left/right move, hold Space to fire |
+| Game | Root menu |
+| Display settings | Root menu |
+| Calibration test | Display settings, retaining the selected row |
+| Root menu | Black home page, exiting fullscreen |
 
-High scores and display settings are saved locally in this browser. Nothing is sent to a server. Losing focus pauses an active game. Games are intentionally minimal independent implementations, with original pixel graphics rather than ROMs, extracted sprites, or copied game code.
+Returning to the home page resets every display setting to its default. Display settings last only for the current visit inside the monitor. High scores are retained.
 
-## GitHub Pages: use the ZIP
+In browsers that permit keyboard locking, nested back navigation stays in native fullscreen. If a browser reserves Escape, the app preserves the previous screen in an expanded page view; browser controls may return. Holding Escape can activate the browser's fullscreen escape hatch. Browser Back also steps through the app while it is open.
 
-1. Extract **the contents** of `phosphor-github-pages.zip` into your repository root. `index.html` must be at the root, not inside an extra enclosing folder. Include `.nojekyll`.
-2. Commit and push to your `main` branch.
-3. In the repository's **Settings → Pages → Build and deployment**, choose **Deploy from a branch**, then **main** and **/(root)**. Save.
-4. Open the Pages URL GitHub provides when deployment completes.
+## Settings and calibration
 
-All URLs are relative, so project paths such as `https://username.github.io/repository/` work. No npm install, API keys, environment variables, cloud service, or framework is required. The ZIP does not contain the private development site's hosting metadata or credentials. Its source is editable directly.
+Select **Display settings** from the root menu. The controls are phosphor pixels rendered behind the glass; there are no HTML settings panels or pop-up windows.
 
-Official setup reference: https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site
+Use up/down to select a setting, left/right to adjust it, and Space to activate it. The list scrolls as you move. **Display test** is available only from settings. Space cycles its grid/levels, beam/focus, and motion/decay patterns; Escape returns to settings.
 
-The private development deployment's access controls belong to its host. They are not included in this static GitHub Pages export; configure access on any destination separately.
+- **Ambient light** ranges from a dark room to an illuminated room, raising the textured phosphor surface's black level along with reflected light.
+- **Reflection** controls environmental glare independently. Environments are **Off**, **Soft room**, **Daylight**, **Desk light**, **Observer**, and **Mixed light**. The observer is a faint procedural silhouette; no camera is used.
+- Beam intensity, afterglow, light scatter, scanlines, curvature, glass depth, and stable display are adjustable. **Reset settings** restores defaults immediately.
+
+At zero ambient light, room reflections and ambient phosphor illumination disappear. The Off environment removes environmental reflections while preserving ambient illumination of the phosphor coating. Stable display initially follows the device's reduced-motion preference.
+
+## Mobile
+
+Play in **landscape**. Portrait displays a rotate-to-play prompt and pauses gameplay. The left circular joystick springs back to its center when released; the right circular button is the action. The top-left **ESC** button is always available inside the monitor, including at the root menu and rotation prompt. Movement and action support simultaneous touches.
+
+The 4:3 display uses the full available landscape height, limited by viewport width. Controls overlay the screen when space is tight rather than reserving margins that shrink it.
+
+Native fullscreen and landscape locking are requested where supported. Otherwise, the app fills the available page viewport. An embedded viewer's header, status bar, or edit overlay belongs to the host app; open the site directly in your browser for the fullest view.
+
+## The display
+
+The games use a **256 × 192**, **4:3** source image with square pixels before glass distortion. Game geometry and boundaries use this landscape playfield directly.
+
+The dependency-free WebGL2 renderer combines:
+
+- A 60 Hz progressive timing model with 262 total lines, 192 active scanlines, and blanking.
+- Scan-timed excitation and integrated fast/slow phosphor decay in floating-point history buffers.
+- Brightness-dependent Gaussian beam reconstruction, horizontal bandwidth, and edge focus.
+- Fixed phosphor texture behind a separate glass surface.
+- Finite-thickness curved glass, ray intersections, Snell refraction, Fresnel reflection/transmission, and path-dependent absorption.
+- Faint internal reflections, surface marks, and subtle procedural room lighting.
+- Multiple scales of light scatter and glow, monochrome green emission, and no RGB shadow mask.
+
+There is no monitor housing or bezel. This is a **physically informed visual model**, not a calibrated reproduction of a measured tube. Material and phosphor parameters are modeled choices. It does not simulate individual electrons, detailed deflection circuitry, permanent burn-in, or measured emission spectra. Asteroids uses this raster rather than a historical vector display.
+
+A simpler Canvas fallback keeps the games playable without WebGL2 or floating-point targets, with reduced glass optics.
 
 ## Run locally
 
-Serve the folder containing `index.html` with a static HTTP server, for example:
+No dependencies or build step. From the ZIP folder containing `index.html`:
 
 ```sh
 python3 -m http.server 8000
 ```
 
-Then open `http://localhost:8000`. Opening the file with `file://` will not work reliably because the app uses JavaScript modules. In the development source repository, serve `dist/` instead (`python3 -m http.server 8000 --directory dist`).
+Open [localhost:8000](http://localhost:8000). Use HTTP because the app uses JavaScript modules. The maintained development repository keeps browser files in `dist/`; serve that folder there. The GitHub Pages ZIP puts them at its root.
 
-Run the dependency-free gameplay tests with `npm test` or `node --test tests/*.test.mjs` using a current Node.js release. Node is only needed for tests, not for hosting.
+## Deploy to GitHub Pages
 
-## The display model
+Extract the ZIP contents into the repository root, including `.nojekyll`. Commit and push, then choose **Settings → Pages → Deploy from a branch → main → /(root)**.
 
-The games draw grayscale light intensities into an offscreen canvas of exactly **160 × 192** samples. That raster is displayed at **4:3**, so its samples are deliberately non-square. All game text, shapes, and scores pass through the same raster renderer. The surrounding controls are regular HTML for readability and accessibility.
+All asset paths are relative. No keys, backend, framework, or package installation is needed. The ZIP excludes private development-site credentials and hosting metadata. Destination hosting controls access separately.
 
-The WebGL2 pipeline uses:
+## Tests
 
-1. **Raster excitation.** A 60 Hz progressive raster with 262 total timing lines and 192 active lines. Per-sample excitation follows its scan time, including vertical blanking. The scan state is accumulated in floating-point ping-pong buffers.
-2. **Temporal integration.** Fast and slow exponential phosphor components with illustrative 1.7 ms and 25 ms default decay constants. Each browser frame analytically integrates the decay and any excitation pulses during its exposure interval. This avoids pretending that a visibly slow scan bar represents a 15.72 kHz sweep.
-3. **Beam reconstruction.** A continuous horizontal bandwidth model and Gaussian vertical beam profile at display resolution. Beam width varies with brightness and edge position. The gaps between lines arise from the beam profile rather than a black-stripe overlay. No RGB shadow mask is applied to a monochrome tube.
-4. **Optical scatter.** Two blur scales for tight glow and wider halation, composed with the direct emission.
-5. **Faceplate optics.** A curved screen mapping, an approximate refracted view of the phosphor through the faceplate, angle-dependent reflection, faint internal ghosting, mild edge defocus, procedural room reflection, and a green-tinted ambient surface. There is no modeled outer monitor.
-6. **Output.** A green-only emission palette, soft intensity rolloff, subtle fixed phosphor granularity, and very small temporal noise. Render targets are capped at a 1400-pixel width and 2× device pixel ratio.
+With Node.js installed:
 
-**This is a physically informed visual approximation, not a calibrated simulator of a named historical CRT.** Decay curves, color, focus, and glass parameters are illustrative. It does not simulate individual electrons, measured phosphor spectra, volumetric glass scattering, exact deflection-coil behavior, permanent burn-in, or a camera sensor. A modern display cannot reproduce a CRT's temporal behavior or light spectrum exactly. The procedural reflection does not use a camera or reflect your actual room. Asteroids' lines are rasterized, rather than driven as a historical vector CRT.
+```sh
+npm test
+```
 
-**Display settings** exposes beam intensity, afterglow, scatter, scanline definition, curvature, and glass strength. A calibration pattern includes a grid, moving trace, intensity steps, and alternating lines. **Stable display** suppresses temporal grain; the operating system's reduced-motion preference sets its initial value.
-
-WebGL2 and floating-point render targets are preferred. If unavailable, a labeled Canvas 2D fallback offers a simpler green display with trails and scanlines. It does not reproduce the advanced glass and integrated beam model.
+Tests cover game progression and collisions, Tetris visibility after line clears, native landscape geometry, new-game physics and turns, menu and joystick input, settings controls, calibration, and nested fullscreen/back navigation.
 
 ## Files
 
 | File | Purpose |
 | --- | --- |
-| `index.html` | Accessible controls and display shell |
-| `style.css` | Responsive green-and-black layout |
-| `app.js` | Input, game loop, settings, calibration and local scores |
-| `games.js` | Five games and a tiny bitmap font |
-| `crt.js` | WebGL2 phosphor and glass renderer, with fallback |
-| `tests/games.test.mjs` | Gameplay transitions and monochrome rendering checks |
-
-The maintained development source stores browser files under `dist/`. The portable ZIP flattens those files to its root for GitHub Pages.
+| `app.js` | Launcher, session lifecycle, navigation, input, and rendering loop |
+| `interface.js` | Pixel launcher lettering and CRT root menu |
+| `controls.js` | Input-source merging, joystick mapping, menu navigation |
+| `fullscreen.js` | Native fullscreen, keyboard locking, and expanded-view fallback |
+| `settings-screen.js` | Pixel settings navigation and rendering |
+| `display-settings.js` | Defaults and numeric validation |
+| `calibration.js` | Grid, beam, and motion test patterns |
+| `games.js` | Five original games, bitmap font, and game registry |
+| `extra-games.js` | Snake, Lunar Lander, and Scorched Tanks |
+| `crt.js` | Scan, phosphor, glass, reflection, and glow rendering |
+| `style.css` | Black launcher, fullscreen layout, minimal touch controls |
 
 ## License
 
-The original code in this project is supplied under the MIT license in `LICENSE`. Classic game names identify gameplay inspirations; no affiliation with the original publishers is claimed.
+[MIT](LICENSE). Original code and pixel graphics; no ROMs or extracted assets. Classic game names identify gameplay inspirations.

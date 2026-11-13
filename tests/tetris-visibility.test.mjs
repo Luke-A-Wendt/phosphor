@@ -26,8 +26,8 @@ test('falling pieces remain visible and descend after a line-clear animation',()
       game.render({fillStyle:'#000',fillRect(x,y,w,h){draws.push({x,y,w,h,color:this.fillStyle});}});
       game.shape.forEach((row,y)=>row.forEach((occupied,x)=>{
         if(occupied&&game.y+y>=0)assert.ok(draws.some(d=>
-          d.x===20+(game.x+x)*7 && d.y===28+(game.y+y)*7 &&
-          d.w===6 && d.h===6 && d.color==='rgb(242,242,242)'),
+          d.x===88+(game.x+x)*8 && d.y===24+(game.y+y)*8 &&
+          d.w===7 && d.h===7 && d.color==='rgb(242,242,242)'),
           'active piece must be drawn at its current falling position');
       }));
       game.update(1/120,drop);

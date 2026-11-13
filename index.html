@@ -1,56 +1,28 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#030705">
-  <meta name="description" content="Five minimal arcade games through a 160 by 192 green phosphor raster. A study in light, persistence, and play.">
-  <title>PHOSPHOR / 160 × 192</title>
-  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="description" content="PHOSPHOR. Eight minimal arcade games, one green phosphor screen.">
+<title>PHOSPHOR</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./style.css">
 </head>
 <body>
-  <div class="app">
-    <header class="masthead">
-      <a href="./" class="wordmark" aria-label="Phosphor home">PHOSPHOR<span class="wordmark-dot">·</span></a>
-      <span class="edition">A STUDY IN LIGHT & PLAY</span>
-      <button id="settings-open" class="text-button" aria-haspopup="dialog"><span aria-hidden="true">≡</span> Display settings</button>
-    </header>
-    <main>
-      <div class="topline"><span>MONOCHROME ARCADE</span><span class="signal"><i></i> 160 × 192 <b>/</b> 60 Hz</span></div>
-      <nav id="game-nav" aria-label="Choose a game"></nav>
-      <section class="display-section" aria-label="Arcade display">
-        <div class="screen-wrap" id="screen-wrap">
-          <canvas id="screen" width="960" height="720" tabindex="0" aria-label="Green phosphor game screen. Press Space to play. Arrow keys to move."></canvas>
-          <div id="fatal" hidden>Display unavailable. Please reload in a modern browser.</div>
-        </div>
-        <div class="screen-caption"><span id="game-description">A single point of light. Keep it in play.</span><span id="high-score">BEST <b>0000</b></span></div>
-      </section>
-      <section class="playbar" aria-label="Game controls">
-        <div class="game-actions">
-          <button id="play" class="play-button"><span aria-hidden="true">▶</span> <span id="play-label">Start game</span></button>
-          <button id="restart" class="icon-button" aria-label="Restart game" title="Restart · R">↻</button>
-          <button id="fullscreen" class="icon-button" aria-label="Fullscreen display" title="Fullscreen · F">⛶</button>
-        </div>
-        <div id="instructions" class="instructions"></div>
-      </section>
-      <div class="touch-controls" id="touch-controls" aria-label="Touch gamepad">
-        <div class="direction-buttons"><button data-key="ArrowLeft" aria-label="Move left">←</button><div><button data-key="ArrowUp" aria-label="Rotate or thrust">↑</button><button data-key="ArrowDown" aria-label="Move down">↓</button></div><button data-key="ArrowRight" aria-label="Move right">→</button></div>
-        <button class="touch-action" data-key="Space" id="touch-action">FIRE</button>
-      </div>
-      <p id="status" class="sr-only" aria-live="polite"></p>
-    </main>
-    <footer><span>FIVE GAMES. ONE PHOSPHOR.</span><span id="renderer-label">INITIALIZING DISPLAY</span></footer>
+<main id="launcher" class="launcher">
+  <button id="open-phosphor" class="launch-button" aria-label="Open Phosphor"><canvas id="launch-mark" width="192" height="48" aria-hidden="true"></canvas><span class="sr-only">OPEN PHOSPHOR</span></button>
+</main>
+<section id="arcade" class="arcade" data-mode="home" aria-label="Phosphor arcade" hidden>
+  <div class="screen-wrap"><canvas id="screen" width="1024" height="768" tabindex="0" aria-label="PHOSPHOR game menu"></canvas><p id="fatal" hidden>Unable to initialize the display. Reload to try again.</p></div>
+  <div class="touch-controls" aria-label="Arcade controller">
+    <button id="menu-back" class="menu-back" aria-label="Back">ESC</button>
+    <div id="joystick" class="joystick" role="group" aria-label="Movement joystick"><span class="joystick-center"></span><span class="joystick-stick"></span></div>
+    <button id="action" class="action-button" aria-label="Action"><span></span></button>
   </div>
-  <dialog id="settings" aria-labelledby="settings-title">
-    <div class="dialog-head"><div><p class="eyebrow">TUBE CALIBRATION</p><h1 id="settings-title">Tune the light.</h1></div><button id="settings-close" class="icon-button" aria-label="Close display settings">×</button></div>
-    <p class="settings-intro">The signal stays at 160 × 192. The surface is yours to adjust.</p>
-    <div id="sliders"></div>
-    <div class="toggle-row"><label for="test-pattern">Calibration pattern<small>Grid, beam widths & moving traces</small></label><input type="checkbox" id="test-pattern"></div>
-    <div class="toggle-row"><label for="reduced-motion">Stable display<small>Suppress flicker & temporal grain</small></label><input type="checkbox" id="reduced-motion"></div>
-    <button id="reset-display" class="reset-button">Reset display settings ↺</button>
-    <details><summary>About the display model</summary><p>A 60 Hz progressive raster with 192 active lines in a 262-line timing model. The renderer approximates scan-timed phosphor excitation, decay, beam spread, halation and a curved glass faceplate. Modern displays cannot reproduce an electron beam's timing or spectrum exactly.</p><p>This is a physically informed visual model, not a calibrated emulation of a particular tube. Glass reflections are procedural; they do not reflect your surroundings. No RGB mask is used on this monochrome display.</p></details>
-  </dialog>
-  <script type="module" src="./app.js"></script>
+  <section id="rotate" class="rotate" aria-label="Rotate your phone" hidden><svg viewBox="0 0 64 64" aria-hidden="true"><rect x="21" y="13" width="22" height="38" rx="4"/><path d="M11 30a22 22 0 0 1 38-15m0 0v-8m0 8h-8M53 34A22 22 0 0 1 15 49m0 0v8m0-8h8"/></svg><p>ROTATE TO LANDSCAPE</p></section>
+  <p id="status" class="sr-only" role="status" aria-live="polite"></p>
+</section>
+<script type="module" src="./app.js"></script>
 </body>
 </html>
