@@ -1,4 +1,4 @@
-# [PHOSPHORUS](https://luke-a-wendt.github.io/phosphorus/)
+# [PHOSPHOR](https://luke-a-wendt.github.io/phosphor/)
 
 Eight minimal arcade games behind curved green glass. **PHOSPHOR** draws its games, menus, settings, and calibration patterns into the same 256 × 192 monochrome raster.
 
