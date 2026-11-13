@@ -2,6 +2,8 @@
 
 Eight minimal arcade games behind curved green glass. **PHOSPHOR** draws its games, menus, settings, and calibration patterns into the same 256 × 192 monochrome raster.
 
+<img width="1441" height="1079" alt="image" src="https://github.com/user-attachments/assets/f9afccd4-5c64-415e-b8a2-425de6ca7cac" />
+
 ## Open and play
 
 The home page is one black, full-page button. The glowing prompt says **CLICK TO OPEN PHOSPHOR** on desktop or **TAP TO OPEN PHOSPHOR** on touch devices. Click or tap anywhere on the page to enter fullscreen. The prompt stays centered in the visible page viewport as browser bars change. Everything else is inside the monitor.
