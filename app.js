@@ -20,14 +20,16 @@ const MENU_ITEMS=[...GAME_INFO,{id:'settings',name:'Settings'}];
 const input=new InputState(),menu=new MenuNavigation(MENU_ITEMS.length);
 const coarse=matchMedia('(any-pointer: coarse)'),portrait=matchMedia('(orientation: portrait)');
 const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const defaults=()=>normalizeSettings({},reducedMotion);
+// Use the same default power sequence on every device; Stable Display remains
+// an explicit in-monitor setting rather than a device-dependent startup choice.
+const defaults=()=>normalizeSettings({reducedMotion:false});
 let options=defaults(),game=null,mode='home',paused=false,blocked=false,testPattern=0;
 let powerWasVisible=false;
 let clock=0,last=0,accumulator=0,drawClock=0,lastSelection=-1,lastSetting='';
 let historyEntry=false,historyTransition=false,handlingHistory=false;
 const historyToken='phosphor-'+Date.now();
 let best={};try{const saved=JSON.parse(localStorage.getItem('phosphor-best-v1'));if(saved&&typeof saved==='object')best=saved;}catch{}
-const sound=new AudioEngine(),power=new PowerSequence({reducedMotion});
+const sound=new AudioEngine(),power=new PowerSequence({reducedMotion:options.reducedMotion});
 let touchKeys=null,closeResolve=null,closePromise=null,nativeExitSeen=false,powerSoundPending=false;
 input.sound=event=>sound.gameSound(game?.id,event);
 const settings=new SettingsScreen({options,defaults:defaults(),onChange:next=>{options=normalizeSettings(next,reducedMotion);renderer?.setOptions(options);sound.setOptions(options);power.reducedMotion=options.reducedMotion;},onTest:showTest});

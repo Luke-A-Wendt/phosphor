@@ -250,28 +250,28 @@ export class AudioEngine {
   if(!this._ready('monitor'))return;
   const c=this.ctx,d=starting?.8:1.55,count=Math.ceil(c.sampleRate*d);
   const buffer=c.createBuffer(1,count,c.sampleRate),data=buffer.getChannelData(0);
-  const variation=this._rand(.98,1.02),modes=[[54,.20,.42],[128,.34,.32],[143,.27,.39],[164,.23,.27],[326,.045,.13]];
-  const phase=modes.map(()=>0);let excitation=0;
+  const variation=1,modes=[[54,.07,.52],[128,.16,.48],[143,.13,.55],[164,.11,.43],[326,.055,.28]];
+  // Dephased modes and a slow onset avoid a coherent low-frequency drum hit.
+  const phase=[0,1.7,4.2,2.8,5.1];
   for(let n=0;n<count;n++){
-   const t=n/c.sampleRate,attack=1-Math.exp(-t/.016),release=Math.min(1,Math.max(0,(d-t)/.12));
+   const t=n/c.sampleRate,attack=(1-Math.exp(-t/.075))**2,release=Math.min(1,Math.max(0,(d-t)/.12));
    let sample=0;
    for(let k=0;k<modes.length;k++){
     const [f,weight,decay]=modes[k];
-    const settle=1+.06*Math.exp(-t/.075)+.012*Math.exp(-t/.2)*Math.cos(2*Math.PI*11*t);
+    const settle=1+.007*Math.exp(-t/.35)*Math.cos(2*Math.PI*8*t);
     phase[k]+=2*Math.PI*f*variation*(starting?1.13:1)*settle/c.sampleRate;
     sample+=weight*Math.sin(phase[k])*Math.exp(-t/(decay*(starting?.65:1)));
    }
-   excitation=.95*excitation+.05*this._rand(-1,1);
-   data[n]=(sample+excitation*.18*Math.exp(-t/.06))*attack*release;
+   data[n]=sample*attack*release;
   }
-  const source=c.createBufferSource(),gain=c.createGain();source.buffer=buffer;gain.gain.value=starting?.085:.14;
+  const source=c.createBufferSource(),gain=c.createGain();source.buffer=buffer;gain.gain.value=starting?.075:.12;
   source.connect(gain);gain.connect(this.buses.monitor);this._track(source,[source,gain],'monitor',c.currentTime+d);source.start();source.stop(c.currentTime+d+.01);
  }
  _playPowerOn(){
   this._powerResonance(true);
   this._noise('monitor',.07,.035,{frequency:650,attack:.012});
-  this._tone('monitor',58,1.55,.12,{to:60,type:'sine',attack:.055});
-  this._tone('monitor',116,1.2,.045,{to:120,type:'triangle',cutoff:420,attack:.045});
+  this._tone('monitor',58,1.55,.055,{to:60,type:'sine',attack:.055});
+  this._tone('monitor',116,1.2,.022,{to:120,type:'triangle',cutoff:420,attack:.045});
   this._noise('monitor',1.1,.055,{when:.025,frequency:380,attack:.06});
   this._tone('monitor',14800,1.85,.006,{when:.08,to:15720,attack:.15});
   this._startHum();

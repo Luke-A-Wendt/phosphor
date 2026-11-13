@@ -265,7 +265,7 @@ test('power-off has a finite soft low resonance with an audible decaying tail an
  assert.ok(buffer,'mechanical ring continues beyond the old short off snap');
  const data=buffer.getChannelData(0),rms=(a,b)=>{const s=data.subarray(a*c.sampleRate,b*c.sampleRate);return Math.sqrt(s.reduce((n,v)=>n+v*v,0)/s.length);};
  assert.equal(data[0],0);assert.ok(data.every(v=>Number.isFinite(v)&&Math.abs(v)<1));
- assert.ok(rms(0,.004)<rms(.03,.1),'onset ramps rather than snapping');
+ assert.ok(rms(0,.02)<rms(.10,.20)*.2,'slow dephased onset avoids a drum-like pressure hit');
  assert.ok(rms(.65,.9)>.004,'late low resonances remain present');
  assert.ok(rms(1.25,1.5)<rms(.65,.9),'the tail decays naturally');
  assert.ok([...audio.voices].filter(v=>v.source.kind==='osc').every(v=>v.source.frequency.events[0][1]>10000),'no cartoon low sine swoop');

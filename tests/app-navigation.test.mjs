@@ -390,7 +390,7 @@ test('Back can cancel a portrait startup with fullscreen still pending, without 
 });
 
 test('reduced-motion mode preserves a visible startup and shutdown fade without collapsing geometry',async()=>{
- const h=harness({mobile:true,reducedMotion:true});await h.launch({warm:false});await h.advance(POWER_ON_SECONDS*.6);
+ const h=harness({mobile:true,reducedMotion:true});h.run('options.reducedMotion=true');await h.launch({warm:false});await h.advance(POWER_ON_SECONDS*.6);
  assert.equal(h.run('power.phase'),'starting');assert.ok(h.run('power.state.level')>0&&h.run('power.state.level')<1);
  await h.advance(POWER_ON_SECONDS);const start=h.renderedPowers.length;
  h.touchDown('menu-back');await h.settle();await h.advance(POWER_OFF_SECONDS*.5);
@@ -459,4 +459,15 @@ test('first visible frame anchors warm-up after a long pending fullscreen interv
  await h.resolveFullscreen();await h.advanceAtRate(.5,2);
  assert.equal(h.run('power.time'),0,'the interval before the first visible frame is not counted');assert.equal(h.run('sound.powered'),true);
  await h.advanceAtRate(.5,30);assert.ok(Math.abs(h.run('power.time')-.5)<1e-8);
+});
+
+test('desktop and mobile start with identical power effects regardless of device motion preference',async()=>{
+ const snapshots=[];
+ for(const mobile of [false,true]){
+  const h=harness({mobile,reducedMotion:mobile});await h.launch({warm:false});await h.advance(.7);
+  assert.equal(h.run('options.reducedMotion'),false);const starting=h.run('power.state');
+  await h.advance(POWER_ON_SECONDS);await h.escape({finish:false});await h.advance(.45);
+  snapshots.push(JSON.stringify({starting,stopping:h.run('power.state')}));
+ }
+ assert.equal(snapshots[0],snapshots[1]);
 });
