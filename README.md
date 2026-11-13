@@ -1,4 +1,4 @@
-# PHOSPHOR
+# [PHOSPHORUS](https://luke-a-wendt.github.io/phosphorus/)
 
 Five small arcade games on a 160 × 192 monochrome green raster. No monitor housing, no textures or downloaded assets, no external dependencies, and no build step.
 
