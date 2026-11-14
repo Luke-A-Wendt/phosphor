@@ -13,9 +13,10 @@ const ROWS=[
  {key:'persistence',label:'AFTERGLOW',note:'PHOSPHOR DECAY TIME'},
  {key:'bloom',label:'LIGHT SCATTER',note:'GLOW AROUND BRIGHT PIXELS'},
  {key:'scanlines',label:'SCANLINES',note:'SEPARATION OF RASTER LINES'},
- {key:'curvature',label:'CURVATURE',note:'CURVED SCREEN GEOMETRY'},
- {key:'glass',label:'GLASS DEPTH',note:'GLASS THICKNESS AND REFRACTION'},
+ {key:'curvature',label:'CURVATURE',max:2,note:'CURVED SCREEN GEOMETRY'},
+ {key:'glass',label:'GLASS DEPTH',max:2,note:'GLASS THICKNESS AND REFRACTION'},
  {key:'reducedMotion',label:'STABLE DISPLAY',note:'REDUCES RASTER FLUCTUATION',type:'boolean'},
+ {key:'degauss',label:'DEGAUSS',note:'DEMAGNETIZE / ENTER TO ACTIVATE',type:'action'},
  {key:'musicVolume',label:'MUSIC',note:'GAME MUSIC / ZERO MUTES',max:1},
  {key:'gameVolume',label:'GAME SOUNDS',note:'GAME EFFECTS / ZERO MUTES',max:1},
  {key:'monitorVolume',label:'MONITOR SOUNDS',note:'CRT POWER AND HUM / ZERO MUTES',max:1},
@@ -28,9 +29,9 @@ const fill=(ctx,x,y,w,h,intensity)=>{const value=Math.round(intensity*255);ctx.f
 
 /** Keyboard and joystick operated settings, drawn into the same phosphor raster. */
 export class SettingsScreen {
- constructor({mobile=false,options=DISPLAY_DEFAULTS,onChange=()=>{},onTest=()=>{},defaults=DISPLAY_DEFAULTS}={}){
+ constructor({mobile=false,options=DISPLAY_DEFAULTS,onChange=()=>{},onTest=()=>{},onDegauss=()=>{},defaults=DISPLAY_DEFAULTS}={}){
   this.options=normalizeSettings(options);this.defaults=normalizeSettings(defaults);
-  this.onChange=onChange;this.onTest=onTest;
+  this.onChange=onChange;this.onTest=onTest;this.onDegauss=onDegauss;
   this.rows=ROWS.filter(row=>!row.mobileOnly||mobile);
   this.navigation=new MenuNavigation(this.rows.length);
   this.adjustDirection=0;this.adjustClock=0;this.top=0;
@@ -69,7 +70,8 @@ export class SettingsScreen {
  }
  activate(){
   const row=this.rows[this.index];
-  if(row.key==='test'){this.release();this.onTest();}
+  if(row.key==='degauss'){this.release();this.onDegauss();}
+  else if(row.key==='test'){this.release();this.onTest();}
   else if(row.key==='reset')this.change({...this.defaults});
   else if(row.type==='boolean')this.change({...this.options,[row.key]:!this.options[row.key]});
   else this.adjust(1);

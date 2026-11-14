@@ -42,7 +42,7 @@ test('fallback tint reaches beam, collapsed line and spot, including bent shutdo
   assert.ok(calls.some(c=>c.color===colorCSS(colors.beam)&&c.op==='multiply'));
   assert.ok(calls.some(c=>c.color?.kind==='line'&&c.color.stops.some(([,v])=>v.startsWith(colorCSS(colors.core).split(',1)')[0]))));
   assert.ok(calls.some(c=>c.color?.kind==='spot'&&c.color.stops.some(([,v])=>v===colorCSS(colors.spot,.18))));
-  assert.equal(calls.filter(c=>c.kind==='image').length,64,'two layers across thirty-two bowed columns');
+  assert.equal(calls.filter(c=>c.kind==='image').length,128,'two layers across sixty-four bowed columns');
   for(const call of calls.filter(c=>c.kind==='image'))assert.ok(call.args.slice(1).every(Number.isFinite));
  }
 });

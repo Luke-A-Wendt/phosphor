@@ -14,7 +14,7 @@ test('missing or invalid stored settings fall back to independent usable default
     assert.equal(result.environment,'diffuse');
   }
   const copy=normalizeSettings();copy.brightness=0;copy.environment='none';
-  assert.equal(normalizeSettings().brightness,1.73);
+  assert.equal(normalizeSettings().brightness,1.75);
   assert.equal(normalizeSettings().environment,'diffuse');
 });
 

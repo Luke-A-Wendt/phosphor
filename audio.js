@@ -203,7 +203,7 @@ export class AudioEngine {
    data[n]=(.9*bass*gust+.1*grain*gravel)*attack*decay*final;
   }
   data[0]=0;data[count-1]=0;
-  const source=c.createBufferSource(),gain=c.createGain(),filter=c.createBiquadFilter();source.buffer=buffer;gain.gain.value=1.5;
+  const source=c.createBufferSource(),gain=c.createGain(),filter=c.createBiquadFilter();source.buffer=buffer;gain.gain.value=4.5;
   filter.type='lowpass';filter.frequency.value=230;filter.Q.value=.5;
   source.connect(filter);filter.connect(gain);gain.connect(this.buses.game);this._track(source,[source,filter,gain],'game',c.currentTime+d);source.start();source.stop(c.currentTime+d+.01);
  }
@@ -218,6 +218,13 @@ export class AudioEngine {
   this._noise('game',.065,.20,{frequency:2300*variation,to:1100,type:'bandpass',q:.55,hold:.012});
   this._noise('game',large?.95:.5,.34,{frequency:gameId==='lander'?760:1100,to:160,attack:.008,hold:large?.075:.03});
   this._noise('game',large?1.15:.65,.26,{when:.018,frequency:300,to:85,attack:.025,hold:.06});
+ }
+ degauss(){
+  if(!this._ready('monitor'))return;
+  this._noise('monitor',.09,.045,{frequency:700,attack:.012});
+  this._tone('monitor',60,2.4,.12,{type:'sine',attack:.035});
+  this._tone('monitor',120,1.8,.065,{type:'triangle',cutoff:480,attack:.025});
+  this._noise('monitor',1.65,.08,{frequency:420,to:80,attack:.035,white:true,roll:.35,tail:.18});
  }
  keyDown(key=''){
   if(!this._ready('keyboard')){if(this.options.keyboardVolume>0)this._queueEvent({kind:'key',key});return;}

@@ -143,6 +143,7 @@ uniform float curvature;
 uniform float glass;
 uniform float bloom;
 uniform float motion;
+uniform float degaussTime;
 uniform float ambient;
 uniform float reflection;
 uniform float environmentMode;
@@ -235,7 +236,7 @@ void main(){
   float outerDistance=roundedBox(p,vec2(1.308,0.975),0.112);
   float outerMask=1.0-smoothstep(-aa,aa,outerDistance);
   // Avoid huge radii at zero curvature while retaining a virtually flat mode.
-  float outerRadius=max(1.95,3.15/max(0.04,c));
+  float outerRadius=max(1.95-0.10*max(0.0,c-2.0),3.15/max(0.04,c));
   float thickness=0.095*max(g,0.025);
   float innerRadius=outerRadius-thickness;
   vec3 center=vec3(0,0,-outerRadius);
@@ -266,7 +267,18 @@ void main(){
   float across=clamp((image.x-0.5)/max(powerScale.x*0.5,0.001),-1.0,1.0);
   // Residual yoke current bows the raster as its supply falls. Only emission
   // bends; the faceplate, coating and room reflections stay stationary.
-  vec2 raster=image-vec2(0.0,powerBend*(1.0-across*across));
+  // Project the raster itself onto a bowed faceplate. Refraction alone
+  // barely bends a front-on image, especially with thin glass. Cross-axis
+  // deflection makes horizontal and vertical grid lines bow continuously.
+  vec2 centered=image*2.0-1.0;
+  float rasterCurve=0.06*c;
+  vec2 curvedImage=0.5+0.5*centered*(1.0+rasterCurve*centered.yx*centered.yx);
+  vec2 raster=curvedImage-vec2(0.0,powerBend*(1.0-across*across));
+  float dg=exp(-degaussTime*2.2)*(1.0-smoothstep(1.8,2.4,degaussTime))*motion;
+  float wobble=sin(degaussTime*47.0)*dg;
+  raster+=vec2(sin(image.y*8.0+degaussTime*19.0)*0.055*wobble,
+               sin(image.x*6.0-degaussTime*13.0)*0.025*wobble);
+  raster=0.5+(raster-0.5)*(1.0+0.045*wobble);
   vec2 emission=(raster-0.5)/max(powerScale,vec2(0.001))+0.5;
   vec2 boundary=abs(raster-0.5)-powerScale*0.5;
   float emissionMask=(1.0-smoothstep(-aa,aa,boundary.x))*(1.0-smoothstep(-aa,aa,boundary.y));
@@ -373,7 +385,7 @@ function program(gl,fragment){
 export class CRTDisplay {
   constructor(canvas,sourceCanvas){
     this.canvas=canvas; this.source=sourceCanvas;this.power={level:1,vertical:1,horizontal:1,spot:0};
-    this.options={tint:DEFAULT_TINT,brightness:1.73,persistence:1,bloom:1.4,curvature:1.85,glass:2,scanlines:1.6,ambient:1.5,reflection:1.45,environment:'diffuse',reducedMotion:false};
+    this.options={tint:DEFAULT_TINT,brightness:1.75,persistence:1,bloom:1.4,curvature:.75,glass:1.25,scanlines:1.6,ambient:1.5,reflection:1.45,environment:'diffuse',reducedMotion:false};
     this._backend='Canvas 2D fallback'; this._targets=[]; this._programs=[]; this._destroyed=false;
     this._contextLost=false; this._lostHandler=e=>{e.preventDefault();this._contextLost=true;this._backend='WebGL context lost';};
     this._restoreHandler=()=>{this._contextLost=false;this.gl=this.gl||this._blitGL;this._blitGL=null;try{this._initGL();this.resize();}catch(e){this._fallback(e);}};
@@ -531,7 +543,12 @@ void main(){color=texture(pixels,uv);}`);
     const clamp=(value,fallback,min=0)=>Number.isFinite(value)?Math.max(min,Math.min(1,value)):fallback;
     this.power={level:clamp(state.level,1),vertical:clamp(state.vertical,1,.001),horizontal:clamp(state.horizontal,1,.001),spot:clamp(state.spot,0),bend:clamp(state.bend,0),focus:clamp(state.focus,0)};
   }
+  degauss(){
+    if((this._degaussTime??3)<2.4)return false;
+    this._degaussTime=0;return true;
+  }
   render(timeSeconds,dtSeconds){
+    this._degaussTime=Math.min(3,(this._degaussTime??3)+Math.max(0,dtSeconds||0));
     if(this._destroyed||this._contextLost)return;
     const dt=Math.min(0.05,Math.max(0.001,Number.isFinite(dtSeconds)?dtSeconds:1/60));
     if(!this.gl){this._renderFallback(dt);return;}
@@ -556,7 +573,7 @@ void main(){color=texture(pixels,uv);}`);
     this._pass(this.programs.blur,this.glowTarget,{image:this.blurHalf.texture},{direction:[0,2.0/h]});
     this._pass(this.programs.blur,this.blurQuarter,{image:this.glowTarget.texture},{direction:[9.0/w,0]});
     this._pass(this.programs.blur,this.scatterTarget,{image:this.blurQuarter.texture},{direction:[0,9.0/h]});
-    this._pass(this.programs.composite,null,{beam:this.beamTarget.texture,glow:this.glowTarget.texture,scatter:this.scatterTarget.texture},{clock:this._clock,curvature:o.curvature,glass:o.glass,bloom:o.bloom,motion:o.reducedMotion?0:1,ambient:o.ambient,reflection:o.reflection,environmentMode:['none','diffuse','window','studio','observer','mixed'].indexOf(o.environment),resolution:[w,h],powerLevel:this.power.level,powerScale:[this.power.horizontal,this.power.vertical],powerSpot:this.power.spot,powerBend:this.power.bend||0,powerFocus:this.power.focus||0,phosphorSpectrum:colors.spectrum,glassTint:colors.glass,coatingTint:colors.coating,pageTint:o.blackBackground?[0,0,0]:colors.page.map(v=>v/255)});
+    this._pass(this.programs.composite,null,{beam:this.beamTarget.texture,glow:this.glowTarget.texture,scatter:this.scatterTarget.texture},{clock:this._clock,curvature:o.curvature,glass:o.glass,bloom:o.bloom,motion:o.reducedMotion?0:1,degaussTime:this._degaussTime??3,ambient:o.ambient,reflection:o.reflection,environmentMode:['none','diffuse','window','studio','observer','mixed'].indexOf(o.environment),resolution:[w,h],powerLevel:this.power.level,powerScale:[this.power.horizontal,this.power.vertical],powerSpot:this.power.spot,powerBend:this.power.bend||0,powerFocus:this.power.focus||0,phosphorSpectrum:colors.spectrum,glassTint:colors.glass,coatingTint:colors.coating,pageTint:o.blackBackground?[0,0,0]:colors.page.map(v=>v/255)});
   }
   _renderFallback(dt){
     const ctx=this.fallback;if(!ctx)return;
@@ -566,13 +583,16 @@ void main(){color=texture(pixels,uv);}`);
     ctx.fillStyle=o.blackBackground?'#000':colorCSS(colors.page);ctx.fillRect(0,0,w,h);ctx.save();
     const r=w*0.025;ctx.beginPath();ctx.roundRect(w*0.025,h*0.025,w*0.95,h*0.95,r);ctx.clip();
     const power=this.power;ctx.save();ctx.translate(w/2,h/2);ctx.scale(power.horizontal,power.vertical);ctx.translate(-w/2,-h/2);
-    const bend=power.bend||0,focus=power.focus||0,columns=bend>.00005?32:1;
+    const dg=this._degaussTime??3,curve=.06*Math.max(0,Math.min(2,o.curvature||0));
+    const bend=(power.bend||0)+(o.reducedMotion?0:.05*Math.sin(dg*47)*Math.exp(-dg*2.2)*Math.max(0,1-dg/2.4)),focus=power.focus||0,columns=Math.abs(bend)>.00005||curve>0?64:1;
     for(let col=0;col<columns;col++){
       const x=col*w/columns,cw=w/columns,across=(col+.5)/columns*2-1;
       // Reverse the UV y direction used by WebGL. Keep beam width finite even
       // as vertical deflection approaches zero.
       const offset=-bend*(1-across*across)*h/Math.max(.001,power.vertical);
       ctx.save();ctx.translate(0,offset);
+      // Bow the raster and its scanlines together; keep the glass stationary.
+      if(curve>0){ctx.translate(0,h/2);ctx.scale(1,1/(1+curve*across*across));ctx.translate(0,-h/2);}
       const draw=()=>columns===1?ctx.drawImage(this._fallbackBuffer,0,0,w,h):ctx.drawImage(this._fallbackBuffer,col*256/columns,0,256/columns,192,x,0,cw+.5,h);
       ctx.imageSmoothingEnabled=true;ctx.filter=`blur(${(Math.max(0,o.bloom)+focus*2)*w/320}px)`;ctx.globalAlpha=.35*power.level;draw();
       ctx.filter=focus>.001?`blur(${focus*w/480}px)`:'none';ctx.globalAlpha=Math.min(1,o.brightness)*power.level;draw();

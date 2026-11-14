@@ -124,3 +124,21 @@ test('mobile arrow side supports left/right adjustment, action toggle, and reset
  h.tap('ArrowRight');h.screen.index=h.screen.rows.findIndex(row=>row.key==='reset');h.tap('Space');
  assert.equal(h.screen.options.arrowsRight,false);
 });
+
+test('degauss is an action and keeps settings open without changing their values',()=>{
+ let pulses=0;const screen=new SettingsScreen({onDegauss:()=>pulses++});
+ screen.index=screen.rows.findIndex(row=>row.key==='degauss');const before={...screen.options};
+ screen.adjust(1);assert.equal(pulses,0);screen.activate();assert.equal(pulses,1);
+ assert.equal(screen.selectionLabel,'DEGAUSS');assert.deepEqual(screen.options,before);
+});
+
+
+test('curvature and glass depth reach 200 percent and clamp there',()=>{
+ const h=harness();
+ for(const key of ['curvature','glass']){
+  h.screen.index=h.screen.rows.findIndex(row=>row.key===key);
+  h.screen.setOptions({...h.screen.options,[key]:1.95});h.tap('ArrowRight');
+  assert.equal(h.screen.options[key],2);assert.match(h.screen.selectionLabel,/200%/);
+  h.tap('ArrowRight');assert.equal(h.screen.options[key],2);
+ }
+});

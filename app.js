@@ -37,7 +37,7 @@ const settings=new SettingsScreen({mobile:coarse.matches,options,defaults:defaul
  const layoutChanged=next.arrowsRight!==options.arrowsRight;
  options=normalizeSettings(next,reducedMotion);renderer?.setOptions(options);sound.setOptions(options);power.reducedMotion=options.reducedMotion;
  if(layoutChanged)updateOrientation();
-},onTest:showTest});
+},onTest:showTest,onDegauss:()=>{if(renderer?.degauss?.()){sound.degauss();}}});
 
 function wakeAudio(){sound.setHidden(Boolean(document.hidden));return document.hidden?Promise.resolve(false):sound.unlock();}
 function clearInput(){input.clear();menu.release();settings.release();touchKeys?.clear();}
