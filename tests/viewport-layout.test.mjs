@@ -13,8 +13,9 @@ function verify(layout){
  for(const key of ['screen','arrows','enter','escape'])within(layout[key],width,height);
  near(layout.screen.width*3,layout.screen.height*4,'the CRT stays 4:3');
  if(layout.keySize>0){
-  near(layout.screen.x-layout.arrows.x-layout.arrows.width,layout.screenGap);
-  near(layout.enter.x-layout.screen.x-layout.screen.width,layout.screenGap);
+  const [left,right]=[layout.arrows,layout.enter].sort((a,b)=>a.x-b.x);
+  near(layout.screen.x-left.x-left.width,layout.screenGap);
+  near(right.x-layout.screen.x-layout.screen.width,layout.screenGap);
   assert.ok(layout.escape.y+layout.escape.height<=layout.arrows.y+1e-8,'Escape has its own vertical space');
   near(layout.arrows.y,layout.enter.y);near(layout.arrows.height,layout.enter.height);
  }
@@ -26,6 +27,24 @@ test('S9 browser viewport fills height and spends spare width on larger keys, no
  near(layout.keySize,81.5);near(layout.screenGap,8);
  near(layout.arrows.x,6);near(layout.enter.x+layout.enter.width,774);
  assert.ok(layout.screen.x+layout.screen.width/2>390,'the CRT shifts right for the wider arrow cluster');
+});
+
+test('right-hand arrows swap positions without resizing keys or CRT, moving Escape, or changing clearances',()=>{
+ const viewports=[{width:780,height:312},{width:740,height:360},{width:640,height:360},{width:1024,height:768},{width:1600,height:400},{width:900,height:400,leftInset:28,rightInset:4,topInset:3,bottomInset:9}];
+ for(const viewport of viewports){
+  const original=solveViewportLayout({...viewport,touch:true});
+  assert.deepEqual(solveViewportLayout({...viewport,touch:true,arrowsRight:false}),original);
+  const swapped=solveViewportLayout({...viewport,touch:true,arrowsRight:true});verify(swapped);
+  assert.deepEqual(swapped.escape,original.escape,'Escape stays exactly where it was');
+  for(const field of ['keySize','keyGap','screenGap'])assert.equal(swapped[field],original[field]);
+  for(const key of ['screen','arrows','enter'])for(const field of ['y','width','height'])assert.equal(swapped[key][field],original[key][field]);
+  near(swapped.enter.x,original.arrows.x);
+  near(swapped.arrows.x+swapped.arrows.width,original.enter.x+original.enter.width);
+  near(original.screen.x-swapped.screen.x,original.arrows.width-original.enter.width);
+  const midpoint=(original.arrows.x+original.enter.x+original.enter.width)/2;
+  assert.ok(swapped.screen.x+swapped.screen.width/2<midpoint);
+  assert.deepEqual(solveViewportLayout({...viewport,arrowsRight:true}),solveViewportLayout(viewport),'desktop is unchanged');
+ }
 });
 
 test('full height is retained while a narrower landscape still fits touch targets',()=>{

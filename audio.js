@@ -8,7 +8,10 @@
 // 5V supply / 4.4V charging. Four ~67ms pulses; mild harmonics retained for
 // small speakers. Cadence follows this game's movement, rather than a ROM timer.
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
-const VOLUMES={musicVolume:1,gameVolume:1,keyboardVolume:1,monitorVolume:1};
+const VOLUMES={musicVolume:1,gameVolume:1,keyboardVolume:.5,monitorVolume:.5};
+// Power transients get extra headroom without raising the continuous hum.
+const POWER_GAIN=1.6;
+const BUS_GAIN={music:1,game:1,keyboard:6,monitor:6};
 const BUS={music:'musicVolume',game:'gameVolume',keyboard:'keyboardVolume',monitor:'monitorVolume'};
 const hz=midi=>440*2**((midi-69)/12);
 // Traditional Korobeiniki melody; this is an original two-voice arrangement.
@@ -33,7 +36,7 @@ export class AudioEngine {
   this.master=c.createGain();this.master.gain.value=.38;
   this.limiter=c.createDynamicsCompressor();this.limiter.threshold.value=-18;this.limiter.knee.value=12;this.limiter.ratio.value=6;this.limiter.attack.value=.003;this.limiter.release.value=.16;
   this.master.connect(this.limiter);this.limiter.connect(c.destination);this.buses={};
-  for(const [name,key] of Object.entries(BUS)){const bus=c.createGain();bus.gain.value=this.options[key];bus.connect(this.master);this.buses[name]=bus;}
+  for(const [name,key] of Object.entries(BUS)){const bus=c.createGain();bus.gain.value=this.options[key]*BUS_GAIN[name];bus.connect(this.master);this.buses[name]=bus;}
   c.onstatechange=()=>{if(this.ctx===c&&c.state==='running')this._flushPending();};
   return true;
  }
@@ -76,7 +79,7 @@ export class AudioEngine {
  setOptions(next={}){
   for(const key of Object.values(BUS))if(Number.isFinite(next[key]))this.options[key]=clamp(next[key],0,1);
   if(!this.ctx||this.ctx.state==='closed'||!this.master)return;
-  for(const [name,key] of Object.entries(BUS)){const p=this.buses[name].gain;p.cancelScheduledValues(this.ctx.currentTime);p.setValueAtTime(p.value,this.ctx.currentTime);p.linearRampToValueAtTime(this.options[key],this.ctx.currentTime+.015);}
+  for(const [name,key] of Object.entries(BUS)){const p=this.buses[name].gain;p.cancelScheduledValues(this.ctx.currentTime);p.setValueAtTime(p.value,this.ctx.currentTime);p.linearRampToValueAtTime(this.options[key]*BUS_GAIN[name],this.ctx.currentTime+.015);}
   if(this.options.musicVolume===0)this._stopTag('music');
   if(this.options.gameVolume===0){this._stopContinuous(null,true);this._stopTag('game');}
  }
@@ -175,10 +178,10 @@ export class AudioEngine {
  // above phone-speaker rolloff without introducing a fixed pitched oscillator.
  _tankRumble(variation){
   if(!this._ready('game'))return;
-  const c=this.ctx,d=4*variation,rate=c.sampleRate,count=Math.ceil(rate*d);
+  const c=this.ctx,d=2.8*variation,rate=c.sampleRate,count=Math.ceil(rate*d);
   const buffer=c.createBuffer(1,count,rate),data=buffer.getChannelData(0),body=new Float32Array(count);
   const coefficient=f=>1-Math.exp(-2*Math.PI*f/rate);
-  const bassLP=coefficient(180*variation),bassHP=coefficient(28),bodyLP=coefficient(680*variation),bodyHP=coefficient(165);
+  const bassLP=coefficient(100*variation),bassHP=coefficient(28),bodyLP=coefficient(260*variation),bodyHP=coefficient(95);
   let low=0,dc=0,mid=0,midDC=0,bassEnergy=0,bodyEnergy=0;
   for(let n=0;n<count;n++){
    low+=bassLP*(this._rand(-1,1)-low);dc+=bassHP*(low-dc);
@@ -188,28 +191,26 @@ export class AudioEngine {
   }
   const bassScale=1/Math.max(.00001,Math.sqrt(bassEnergy/count)),bodyScale=1/Math.max(.00001,Math.sqrt(bodyEnergy/count));
   let gust=.8,target=.8,gustClock=0,gravel=.7,gravelTarget=.7,gravelClock=0;
-  const gustSmooth=1-Math.exp(-1/(rate*.055)),gravelSmooth=1-Math.exp(-1/(rate*.009));
+  const gustSmooth=1-Math.exp(-1/(rate*.18)),gravelSmooth=1-Math.exp(-1/(rate*.12));
   for(let n=0;n<count;n++){
    const time=n/rate;
-   if(gustClock--<=0){target=this._rand(.4,1);gustClock=Math.round(rate*this._rand(.15,.38));}
-   if(gravelClock--<=0){gravelTarget=this._rand(.3,1);gravelClock=Math.round(rate*this._rand(.035,.10));}
+   if(gustClock--<=0){target=this._rand(.4,1);gustClock=Math.round(rate*this._rand(.3,.8));}
+   if(gravelClock--<=0){gravelTarget=this._rand(.3,1);gravelClock=Math.round(rate*this._rand(.2,.5));}
    gust+=(target-gust)*gustSmooth;gravel+=(gravelTarget-gravel)*gravelSmooth;
-   const bass=Math.tanh(data[n]*bassScale*1.5),grain=Math.tanh(body[n]*bodyScale*1.3);
-   const attack=1-Math.exp(-time/.014),decay=Math.pow(Math.max(0,1-time/d),.68);
+   const bass=Math.tanh(data[n]*bassScale*.7),grain=Math.tanh(body[n]*bodyScale*.5);
+   const attack=1-Math.exp(-time/.16),decay=Math.pow(Math.max(0,1-time/d),.68);
    const final=clamp((d-time)/.18,0,1);
-   data[n]=(.67*bass*gust+.33*grain*gravel)*attack*decay*final;
+   data[n]=(.9*bass*gust+.1*grain*gravel)*attack*decay*final;
   }
   data[0]=0;data[count-1]=0;
-  const source=c.createBufferSource(),gain=c.createGain();source.buffer=buffer;gain.gain.value=.32;
-  source.connect(gain);gain.connect(this.buses.game);this._track(source,[source,gain],'game',c.currentTime+d);source.start();source.stop(c.currentTime+d+.01);
+  const source=c.createBufferSource(),gain=c.createGain(),filter=c.createBiquadFilter();source.buffer=buffer;gain.gain.value=.7;
+  filter.type='lowpass';filter.frequency.value=230;filter.Q.value=.5;
+  source.connect(filter);filter.connect(gain);gain.connect(this.buses.game);this._track(source,[source,filter,gain],'game',c.currentTime+d);source.start();source.stop(c.currentTime+d+.01);
  }
  _blast(gameId,large=false){
   const variation=gameId==='tanks'?this._rand(.94,1.06):this._rand(.92,1.08);
   if(gameId==='tanks'){
-   // Original artillery impact: a broad white-noise roar over irregular,
-   // throaty low noise. No pitched oscillator or extracted game recording.
-   this._noise('game',.075,.25,{frequency:3400*variation,to:1500,type:'bandpass',q:.55,hold:.012,white:true});
-   this._noise('game',1.25*variation,.22,{frequency:2600*variation,to:350,attack:.006,hold:.06,white:true,roll:.22,tail:.12});
+   // Soft distant thunder: no bright crack or broadband impact hiss.
    this._tankRumble(variation);
    return;
   }
@@ -220,10 +221,10 @@ export class AudioEngine {
  }
  keyDown(key=''){
   if(!this._ready('keyboard')){if(this.options.keyboardVolume>0)this._queueEvent({kind:'key',key});return;}
-  const weight=/Space|Enter|action/i.test(key)?1.15:1,variation=this._rand(.91,1.09),level=this._rand(.085,.115)*weight;
-  this._noise('keyboard',this._rand(.022,.037),level,{frequency:this._rand(1700,2450),type:'bandpass',q:.65});
-  this._tone('keyboard',this._rand(175,240),this._rand(.045,.065),level*.6,{to:145*variation,type:'triangle',cutoff:1000});
-  this._noise('keyboard',.018,level*.24,{when:this._rand(.009,.016),frequency:850,type:'lowpass'});
+  const weight=/Space|Enter|action/i.test(key)?1.15:1,variation=this._rand(.91,1.09),level=this._rand(.085,.115)*weight*.5;
+  this._noise('keyboard',this._rand(.022,.037),level,{frequency:this._rand(900,1300),type:'lowpass',q:.5,attack:.006});
+  this._tone('keyboard',this._rand(175,240),this._rand(.045,.065),level*.6,{to:145*variation,type:'triangle',cutoff:600,attack:.008});
+  this._noise('keyboard',.018,level*.24,{when:this._rand(.009,.016),frequency:650,type:'lowpass',attack:.004});
  }
  _startHum(){
   if(!this.ctx||this.ctx.state!=='running'||this.hidden||!this.powered||this.loops.length)return;
@@ -264,23 +265,23 @@ export class AudioEngine {
    }
    data[n]=sample*attack*release;
   }
-  const source=c.createBufferSource(),gain=c.createGain();source.buffer=buffer;gain.gain.value=starting?.075:.12;
+  const source=c.createBufferSource(),gain=c.createGain();source.buffer=buffer;gain.gain.value=(starting?.075:.12)*POWER_GAIN;
   source.connect(gain);gain.connect(this.buses.monitor);this._track(source,[source,gain],'monitor',c.currentTime+d);source.start();source.stop(c.currentTime+d+.01);
  }
  _playPowerOn(){
   this._powerResonance(true);
-  this._noise('monitor',.07,.035,{frequency:650,attack:.012});
-  this._tone('monitor',58,1.55,.055,{to:60,type:'sine',attack:.055});
-  this._tone('monitor',116,1.2,.022,{to:120,type:'triangle',cutoff:420,attack:.045});
-  this._noise('monitor',1.1,.055,{when:.025,frequency:380,attack:.06});
-  this._tone('monitor',14800,1.85,.006,{when:.08,to:15720,attack:.15});
+  this._noise('monitor',.07,.035*POWER_GAIN,{frequency:650,attack:.012});
+  this._tone('monitor',58,1.55,.055*POWER_GAIN,{to:60,type:'sine',attack:.055});
+  this._tone('monitor',116,1.2,.022*POWER_GAIN,{to:120,type:'triangle',cutoff:420,attack:.045});
+  this._noise('monitor',1.1,.055*POWER_GAIN,{when:.025,frequency:380,attack:.06});
+  this._tone('monitor',14800,1.85,.006*POWER_GAIN,{when:.08,to:15720,attack:.15});
   this._startHum();
  }
  _playPowerOff(){
   this._powerResonance(false);
-  this._noise('monitor',.85,.025,{when:.015,frequency:420,to:90,attack:.035,roll:.25,tail:.08});
+  this._noise('monitor',.85,.025*POWER_GAIN,{when:.015,frequency:420,to:90,attack:.035,roll:.25,tail:.08});
   // Flyback drive fades out; it does not sweep down through the audible band.
-  this._tone('monitor',15720,.24,.0035,{to:15180,attack:.018});
+  this._tone('monitor',15720,.24,.0035*POWER_GAIN,{to:15180,attack:.018});
  }
  setScene(gameId=null,active=true){
   if(gameId!==this.scene||!active)this._pendingEvents=this._pendingEvents.filter(event=>event.kind!=='game');

@@ -111,13 +111,44 @@ function harness({mobile=false,width=800,height=400,viewport={},safeArea={},redu
  };
 }
 
+test('mobile layout switches immediately, preserves keys and Escape, and resets on exit',async()=>{
+ for(const [width,height] of [[780,312],[312,780]]){
+  const h=harness({mobile:true,width,height});await h.launch();
+  const style=h.elements.get('arcade').style;
+  const geometry=()=>Object.fromEntries(['screen-x','screen-y','screen-width','screen-height','key-size','key-gap','escape-x','escape-y','arrows-x','enter-x','enter-height'].map(key=>[key,style.getPropertyValue('--'+key)]));
+  const original=geometry(),keys=['key-up','key-left','key-down','key-right','action','menu-back'].map(id=>h.elements.get(id));
+  h.key('ArrowUp');h.key('Enter');assert.equal(h.mode(),'settings');
+  h.run("settings.index=settings.rows.findIndex(row=>row.key==='arrowsRight')");
+  // Use the actual touch action key to move the controls while it is pressed.
+  h.touchDown('action');h.tick();assert.equal(h.run('options.arrowsRight'),true);
+  assert.ok(h.elements.get('action').classList.contains('held'));
+  h.touchUp();h.tick();assert.equal(h.elements.get('action').classList.contains('held'),false);
+  assert.equal(h.run('input.down.size'),0);
+  const swapped=geometry();
+  for(const key of Object.keys(original).filter(key=>!['screen-x','arrows-x','enter-x'].includes(key)))assert.equal(swapped[key],original[key],key);
+  assert.equal(swapped['enter-x'],original['arrows-x']);
+  assert.ok(parseFloat(swapped['screen-x'])<parseFloat(original['screen-x']));
+  assert.ok(parseFloat(swapped['arrows-x'])>parseFloat(swapped['screen-x']));
+  h.win.visualViewport.dispatch('resize');assert.deepEqual(geometry(),swapped);
+  await h.mobileBack();assert.equal(h.mode(),'menu');
+  const before=h.run('menu.index'),voicesBefore=h.voices.length;
+  h.touchDown('key-down');h.tick();assert.equal(h.run('menu.index'),(before+1)%(GAME_INFO.length+1));
+  assert.ok(h.elements.get('key-down').classList.contains('held'));assert.ok(h.voices.length>voicesBefore,'the same keyboard sound handler runs');
+  h.touchUp();h.tick();assert.equal(h.elements.get('key-down').classList.contains('held'),false);
+  h.touchDown('action');h.tick();h.touchUp();h.tick();assert.equal(h.mode(),'game');
+  await h.mobileBack();assert.equal(h.mode(),'menu');assert.deepEqual(geometry(),swapped);
+  for(const key of keys)assert.equal(h.elements.get(key.id),key,'existing key elements are retained');
+  await h.mobileBack();assert.equal(h.mode(),'home');assert.equal(h.run('options.arrowsRight'),false);assert.deepEqual(geometry(),original);
+ }
+});
+
 test('launch starts only the root menu; game and settings navigation clear held input',async()=>{
  const h=harness();assert.equal(h.mode(),'home');assert.equal(h.elements.get('launcher').hidden,false);assert.equal(h.elements.get('arcade').hidden,true);
  await h.launch();assert.equal(h.mode(),'menu');assert.equal(h.elements.get('launcher').hidden,true);assert.equal(h.elements.get('arcade').hidden,false);assert.equal(h.depth(),1);
  h.key('Space');assert.equal(h.mode(),'game');assert.equal(h.run('game.status'),'playing');assert.equal(h.run('input.down.size'),0);assert.equal(h.run('input.pressed.size'),0);
  await h.escape();assert.equal(h.mode(),'menu');assert.ok(h.doc.fullscreenElement,'first Escape retains native fullscreen with lock');
  h.key('ArrowUp');h.key('Space');assert.equal(h.mode(),'settings');assert.equal(h.run('input.down.size'),0);
- h.key('ArrowRight');assert.ok(h.run('options.ambient')>normalizeSettings().ambient);
+ h.run("settings.index=settings.rows.findIndex(row=>row.key==='ambient')");h.key('ArrowRight');assert.ok(h.run('options.ambient')>normalizeSettings().ambient);
  await h.escape();assert.equal(h.mode(),'menu');assert.ok(h.run('options.ambient')>normalizeSettings().ambient,'settings persist within this launch');
  await h.escape();assert.equal(h.mode(),'home');assert.equal(h.elements.get('arcade').hidden,true);assert.equal(h.elements.get('launcher').hidden,false);assert.equal(h.elements.get('open-phosphor').disabled,false);assert.equal(h.focus(),'open-phosphor','launcher regains keyboard focus after history cleanup');assert.equal(h.destroyed(),1);assert.equal(h.doc.fullscreenElement,null);assert.equal(h.depth(),0);assert.equal(h.run('options.ambient'),normalizeSettings().ambient);
  await h.launch();assert.equal(h.mode(),'menu');assert.equal(h.run('settings.index'),0);assert.equal(h.run('options.ambient'),normalizeSettings().ambient);
@@ -125,7 +156,7 @@ test('launch starts only the root menu; game and settings navigation clear held 
 
 test('calibration returns to in-screen settings, then menu, then launcher',async()=>{
  const h=harness();await h.launch();h.key('ArrowUp');h.key('Space');assert.equal(h.mode(),'settings');
- h.key('ArrowUp');h.key('ArrowUp');h.key('Space');assert.equal(h.mode(),'test');
+ h.run("settings.index=settings.rows.findIndex(row=>row.key==='test')");h.key('Space');assert.equal(h.mode(),'test');
  h.key('Space');assert.equal(h.run('testPattern'),1);
  await h.escape();assert.equal(h.mode(),'settings');assert.match(h.run('settings.selectionLabel'),/DISPLAY TEST/);
  await h.escape();assert.equal(h.mode(),'menu');await h.escape();assert.equal(h.mode(),'home');assert.equal(h.run('testPattern'),0);
@@ -134,7 +165,7 @@ test('calibration returns to in-screen settings, then menu, then launcher',async
 test('mobile ESC and history Back follow the same navigation levels without leaving stale history',async()=>{
  const h=harness({mobile:true});await h.launch();h.key('Space');assert.equal(h.mode(),'game');
  await h.mobileBack();assert.equal(h.mode(),'menu');
- h.key('ArrowUp');h.key('Space');h.key('ArrowUp');h.key('ArrowUp');h.key('Space');assert.equal(h.mode(),'test');
+ h.key('ArrowUp');h.key('Space');h.run("settings.index=settings.rows.findIndex(row=>row.key==='test')");h.key('Space');assert.equal(h.mode(),'test');
  await h.back();assert.equal(h.mode(),'settings');assert.equal(h.depth(),1);
  await h.back();assert.equal(h.mode(),'menu');assert.equal(h.depth(),1);
  await h.back();assert.equal(h.mode(),'home');assert.equal(h.depth(),0);assert.equal(h.elements.get('arcade').hidden,true);
@@ -166,7 +197,7 @@ test('mobile keys permit simultaneous steering and action; audio settings update
  h.touchCancel(1);assert.equal(h.run("input.down.has('ArrowLeft')"),false);assert.ok(h.run("input.down.has('Space')"));
  h.touchUp(2);assert.equal(h.run('input.down.size'),0);
  await h.mobileBack();h.key('ArrowUp');h.key('Enter');assert.equal(h.mode(),'settings');
- for(let i=0;i<10;i++)h.key('ArrowDown');assert.match(h.run('settings.selectionLabel'),/^MUSIC:/);
+ h.run("settings.index=settings.rows.findIndex(row=>row.key==='musicVolume')");assert.match(h.run('settings.selectionLabel'),/^MUSIC:/);
  h.key('ArrowLeft');assert.ok(h.run('options.musicVolume')<normalizeSettings().musicVolume);assert.ok(h.run('options.musicVolume')>0);assert.equal(h.run('sound.options.musicVolume'),h.run('options.musicVolume'));
  await h.mobileBack();await h.mobileBack();assert.equal(h.mode(),'home');
  await h.launch();assert.equal(h.run('sound.options.musicVolume'),normalizeSettings().musicVolume);
@@ -427,7 +458,7 @@ test('upright mobile uses a sideways landscape stage and restores it on rotation
 test('desktop and mobile tint changes survive child navigation and reset on exit',async()=>{
  for(const mobile of [false,true]){
  const h=harness({mobile});await h.launch();h.key('ArrowUp');h.key('Enter');assert.equal(h.mode(),'settings');
- for(let n=0;n<14;n++)h.key('ArrowDown');assert.match(h.run('settings.selectionLabel'),/^TINT:/);
+ h.key('ArrowDown');assert.match(h.run('settings.selectionLabel'),/^TINT:/);
  h.key('ArrowRight');assert.equal(h.run('options.tint'),130);
  await h.escape();assert.equal(h.mode(),'menu');assert.equal(h.run('options.tint'),130);
  await h.escape();assert.equal(h.mode(),'home');assert.equal(h.run('options.tint'),125);
@@ -470,4 +501,15 @@ test('desktop and mobile start with identical power effects regardless of device
   snapshots.push(JSON.stringify({starting,stopping:h.run('power.state')}));
  }
  assert.equal(snapshots[0],snapshots[1]);
+});
+
+
+test('desktop key input is silent while mobile retains keyboard sounds and its slider',async()=>{
+ for(const mobile of [false,true]){
+  const h=harness({mobile});await h.launch();
+  const start=h.voices.length;
+  h.key('ArrowDown');h.key('Enter');await h.escape();
+  assert.equal(h.voices.slice(start).some(v=>v.tag==='keyboard'),mobile);
+  assert.equal(h.run("settings.rows.some(row=>row.key==='keyboardVolume')"),mobile);
+ }
 });

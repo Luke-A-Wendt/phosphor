@@ -33,7 +33,7 @@ test('audio is optional, gesture-created, and uses independent conservative volu
  let created=0;const c=new Context();c.state='suspended';const audio=new AudioEngine({contextFactory:()=>{created++;return c;}});
  audio.keyDown();audio.powerOn();assert.equal(created,0);assert.equal(await audio.unlock(),true);assert.equal(c.state,'running');assert.equal(created,1);
  assert.equal(audio.master.gain.value,.38);assert.equal(Object.keys(audio.buses).length,4);assert.equal(audio.limiter.ratio.value,6);
- audio.setOptions({musicVolume:0,gameVolume:100,keyboardVolume:-2,monitorVolume:NaN});assert.equal(audio.options.musicVolume,0);assert.equal(audio.options.gameVolume,1);assert.equal(audio.options.keyboardVolume,0);assert.equal(audio.options.monitorVolume,1);
+ audio.setOptions({musicVolume:0,gameVolume:100,keyboardVolume:-2,monitorVolume:NaN});assert.equal(audio.options.musicVolume,0);assert.equal(audio.options.gameVolume,1);assert.equal(audio.options.keyboardVolume,0);assert.equal(audio.options.monitorVolume,.5);
  assert.equal(audio.buses.music.gain.value,0);assert.equal(await new AudioEngine({contextFactory:()=>null}).unlock(),false);assert.equal(await new AudioEngine({contextFactory:()=>{throw Error();}}).unlock(),false);
 });
 
@@ -206,7 +206,7 @@ test('artillery uses pressure, crack and debris noise rather than a pitched lase
  const tones=c.nodes.filter(n=>n.kind==='osc');assert.ok(tones.every(n=>n.type==='sine'&&n.frequency.events[0][1]<100));
  const before=c.nodes.length;c.currentTime+=.5;audio.gameSound('tanks','hit');
  const impact=c.nodes.slice(before);assert.ok(impact.filter(n=>n.kind==='noise').some(n=>n.stopped-n.started>1),'debris/rumble outlasts the initial pressure crack');
- assert.ok(impact.some(n=>n.kind==='filter'&&n.type==='bandpass'));assert.ok(impact.some(n=>n.kind==='filter'&&n.type==='lowpass'));
+ assert.ok(!impact.some(n=>n.kind==='filter'&&n.type==='bandpass'));assert.ok(impact.some(n=>n.kind==='filter'&&n.type==='lowpass'));
 });
 
 test('Pong paddle, wall and score cues are distinct fixed tones',()=>{
@@ -232,23 +232,23 @@ test('both sustained thrusters are softened without changing their distinct filt
  }
 });
 
-test('Tanks impacts carry a broad noise roar and a longer rolling tail without a pitched layer',()=>{
+test('Tanks impacts roll like soft low thunder without a sharp attack or pitched layer',()=>{
  let step=1;const {audio,c}=setup(()=>{step=(step*16807)%2147483647;return step/2147483647;});
  audio.setScene('tanks',true);const blast={};audio.update({id:'tanks',status:'won',blast},true);
- const voices=[...audio.voices];assert.ok(voices.length>=3);assert.ok(voices.every(v=>v.source.kind==='noise'));
- const ends=voices.map(v=>v.end);assert.ok(Math.max(...ends)>3.75&&Math.max(...ends)<4.3);
- assert.ok(c.nodes.some(n=>n.kind==='filter'&&n.type==='lowpass'&&n.frequency.events[0][1]>2400),'impact has broadband body');
- const rumble=voices.find(v=>v.source.buffer?.duration>3.5);assert.ok(rumble,'impact includes the long normalized pressure tail');
+ const voices=[...audio.voices];assert.ok(voices.length>=1);assert.ok(voices.every(v=>v.source.kind==='noise'));
+ const ends=voices.map(v=>v.end);assert.ok(Math.max(...ends)>2.6&&Math.max(...ends)<3);
+ assert.ok(c.nodes.some(n=>n.kind==='filter'&&n.type==='lowpass'&&n.frequency.value<=230),'impact is softly low-pass filtered');
+ const rumble=voices.find(v=>v.source.buffer?.duration>2.5);assert.ok(rumble,'impact includes the long normalized pressure tail');
  const data=rumble.source.buffer.getChannelData(0);
  const rms=(start,end)=>{const block=data.subarray(start*c.sampleRate,end*c.sampleRate);return Math.sqrt(block.reduce((sum,x)=>sum+x*x,0)/block.length);};
- assert.equal(data[0],0);assert.ok(rms(2,2.5)>.10,'late rumble keeps meaningful energy instead of filtering it away');
- assert.ok(rms(3,3.4)>.04,'rumble persists through the fourth second');
+ assert.equal(data[0],0);assert.ok(rms(1.2,1.7)>.04,'late rumble keeps meaningful energy instead of filtering it away');
+ assert.ok(rms(2,2.3)>.02,'rumble remains audible before the shorter fade');
  const highpass=new Float32Array(data.length),alpha=1-Math.exp(-2*Math.PI*180/c.sampleRate);let low=0;
  for(let n=0;n<data.length;n++){low+=alpha*(data[n]-low);highpass[n]=data[n]-low;}
  const phone=highpass.subarray(2*c.sampleRate,3*c.sampleRate);
- assert.ok(Math.sqrt(phone.reduce((sum,x)=>sum+x*x,0)/phone.length)>.055,'audible gravel survives phone-speaker bass rolloff');
+ assert.ok(Math.sqrt(phone.reduce((sum,x)=>sum+x*x,0)/phone.length)<rms(2,3),'low rumble dominates the upper frequencies');
  assert.ok(c.buffers.every(b=>b.getChannelData(0).every(v=>Number.isFinite(v)&&Math.abs(v)<=1)));
- c.currentTime=2.5;c.finishVoices();const tail=[...audio.voices];assert.ok(tail.includes(rumble),'gravelly body and bass remain after the initial roar fades');
+ c.currentTime=2;c.finishVoices();const tail=[...audio.voices];assert.ok(tail.includes(rumble),'gravelly body and bass remain after the initial roar fades');
  const count=c.nodes.length;audio.update({id:'tanks',status:'won',blast},true);assert.equal(c.nodes.length,count,'winning impact is not retriggered');
  audio.update({id:'tanks',status:'playing',blast:null,turn:1},true);assert.ok(audio.voices.has(rumble),'opponent turn does not cut off the tail');
  audio.setScene('tanks',false);assert.equal(audio.voices.size,0);assert.ok(tail.every(v=>v.nodes.every(n=>n.disconnected)),'pause disposes the longer tail');
@@ -271,4 +271,13 @@ test('power-off has a finite soft low resonance with an audible decaying tail an
  assert.ok([...audio.voices].filter(v=>v.source.kind==='osc').every(v=>v.source.frequency.events[0][1]>10000),'no cartoon low sine swoop');
  c.currentTime=1.8;c.finishVoices();assert.equal(audio.voices.size,0);
  audio.setOptions({monitorVolume:0});audio.powerOn();audio.powerOff();assert.equal(audio.voices.size,0);
+});
+
+test('half-scale keyboard and monitor defaults have stronger calibrated gain with headroom',()=>{
+ const {audio}=setup();
+ for(const bus of ['keyboard','monitor']){assert.equal(audio.options[bus+'Volume'],.5);assert.equal(audio.buses[bus].gain.value,3);}
+ audio.setOptions({keyboardVolume:1,monitorVolume:1});
+ assert.equal(audio.buses.keyboard.gain.value,6);assert.equal(audio.buses.monitor.gain.value,6);
+ audio.setOptions({keyboardVolume:0,monitorVolume:0});
+ assert.equal(audio.buses.keyboard.gain.value,0);assert.equal(audio.buses.monitor.gain.value,0);
 });

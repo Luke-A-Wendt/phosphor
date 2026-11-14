@@ -9,7 +9,7 @@ function insets(first,last,size){
 }
 
 export function solveViewportLayout(options={}){
- const {width,height,leftInset=0,rightInset=0,topInset=0,bottomInset=0,touch=false}=options??{};
+ const {width,height,leftInset=0,rightInset=0,topInset=0,bottomInset=0,touch=false,arrowsRight=false}=options??{};
  const w=finiteSize(width),h=finiteSize(height);
  const [left,right]=insets(leftInset,rightInset,w),[top,bottom]=insets(topInset,bottomInset,h);
  const availableWidth=Math.max(0,w-left-right),availableHeight=Math.max(0,h-top-bottom);
@@ -45,6 +45,13 @@ export function solveViewportLayout(options={}){
  result.escape=rect(start,top+pad,keySize,keySize);
  result.arrows=rect(start,controlsBottom-arrowHeight,arrowWidth,arrowHeight);
  result.enter=rect(result.screen.x+screenWidth+screenGap,controlsBottom-arrowHeight,keySize,arrowHeight);
+ // Swap only horizontal placement: retain key geometry, artwork orientation,
+ // clearances and the original Escape position in either thumb layout.
+ if(arrowsRight){
+  result.enter.x=start;
+  result.screen.x=start+keySize+screenGap;
+  result.arrows.x=result.screen.x+screenWidth+screenGap;
+ }
  result.keySize=keySize;result.keyGap=keyGap;result.screenGap=screenGap;
  return result;
 }

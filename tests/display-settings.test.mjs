@@ -59,8 +59,8 @@ test('each calibration pattern draws a finite monochrome landscape raster',()=>{
 });
 
 
-test('sound defaults are full volume and all sound values clamp independently to zero through one',()=>{
- const expected={musicVolume:1,gameVolume:1,keyboardVolume:1,monitorVolume:1};
+test('sound defaults preserve calibrated volume and all sound values clamp independently to zero through one',()=>{
+ const expected={musicVolume:1,gameVolume:1,keyboardVolume:.5,monitorVolume:.5};
  for(const [key,value] of Object.entries(expected)){
   assert.equal(normalizeSettings()[key],value);
   assert.equal(normalizeSettings({[key]:-1})[key],0);
@@ -91,4 +91,12 @@ test('tint is bounded across the complete hue wheel and invalid values restore t
   for(const key of ['beam','line','core','spot','ambient','room','page'])assert.ok(colors[key].every(v=>Number.isFinite(v)&&v>=0&&v<=255));
  }
  assert.deepEqual(phosphorColors(0),phosphorColors(360));
+});
+
+
+test('mobile arrow side defaults left and only accepts explicit booleans',()=>{
+ assert.equal(DISPLAY_DEFAULTS.arrowsRight,false);
+ for(const invalid of [undefined,null,0,1,'true','right',{}])assert.equal(normalizeSettings({arrowsRight:invalid}).arrowsRight,false);
+ assert.equal(normalizeSettings({arrowsRight:true}).arrowsRight,true);
+ assert.equal(normalizeSettings({arrowsRight:false}).arrowsRight,false);
 });

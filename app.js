@@ -32,7 +32,11 @@ let best={};try{const saved=JSON.parse(localStorage.getItem('phosphor-best-v1'))
 const sound=new AudioEngine(),power=new PowerSequence({reducedMotion:options.reducedMotion});
 let touchKeys=null,closeResolve=null,closePromise=null,nativeExitSeen=false,powerSoundPending=false;
 input.sound=event=>sound.gameSound(game?.id,event);
-const settings=new SettingsScreen({options,defaults:defaults(),onChange:next=>{options=normalizeSettings(next,reducedMotion);renderer?.setOptions(options);sound.setOptions(options);power.reducedMotion=options.reducedMotion;},onTest:showTest});
+const settings=new SettingsScreen({mobile:coarse.matches,options,defaults:defaults(),onChange:next=>{
+ const layoutChanged=next.arrowsRight!==options.arrowsRight;
+ options=normalizeSettings(next,reducedMotion);renderer?.setOptions(options);sound.setOptions(options);power.reducedMotion=options.reducedMotion;
+ if(layoutChanged)updateOrientation();
+},onTest:showTest});
 
 function wakeAudio(){sound.setHidden(Boolean(document.hidden));return document.hidden?Promise.resolve(false):sound.unlock();}
 function clearInput(){input.clear();menu.release();settings.release();touchKeys?.clear();}
@@ -45,6 +49,7 @@ function syncInterface(){
  announce(labels[mode]);
 }
 function updateOrientation(){
+ settings.setMobile(coarse.matches);
  const viewport=window.visualViewport;
  const width=viewport?.width>0?viewport.width:window.innerWidth;
  const height=viewport?.height>0?viewport.height:window.innerHeight;
@@ -57,7 +62,7 @@ function updateOrientation(){
  app.dataset.sideways=String(sideways);
  const stageWidth=sideways?height:width,stageHeight=sideways?width:height;
  app.style.setProperty('--stage-width',stageWidth+'px');app.style.setProperty('--stage-height',stageHeight+'px');
- const layout=solveViewportLayout({width:stageWidth,height:stageHeight,touch:coarse.matches,leftInset:inset(sideways?'top':'left'),rightInset:inset(sideways?'bottom':'right'),topInset:inset(sideways?'right':'top'),bottomInset:inset(sideways?'left':'bottom')});
+ const layout=solveViewportLayout({width:stageWidth,height:stageHeight,touch:coarse.matches,arrowsRight:options.arrowsRight,leftInset:inset(sideways?'top':'left'),rightInset:inset(sideways?'bottom':'right'),topInset:inset(sideways?'right':'top'),bottomInset:inset(sideways?'left':'bottom')});
  for(const name of ['screen','arrows','enter','escape'])for(const [field,value] of Object.entries(layout[name]))app.style.setProperty('--'+name+'-'+field,value+'px');
  app.style.setProperty('--key-size',layout.keySize+'px');app.style.setProperty('--key-gap',layout.keyGap+'px');
  const launchLabel=(coarse.matches?'Tap':'Click')+' to open Phosphor';
@@ -100,7 +105,7 @@ function onFullscreenExit(){
 }
 const fullscreen=new FullscreenController({element:app,getMode:()=>mode,onBack:goBack,onExit:onFullscreenExit,beforeExit:beginClose,onChange:syncInterface,onResize:updateOrientation,focusElement:()=>mode==='home'?launchButton:canvas,isMobile:()=>coarse.matches,onNotice:announce});
 function requestBack(){if(mode==='home'||mode==='closing')return;void wakeAudio();clearInput();void fullscreen.escape();}
-touchKeys=new TouchKeys({root:$('#touch-controls'),input,isEnabled:key=>mode!=='home'&&mode!=='closing'&&(key==='Escape'||(!blocked&&!powerInputBlocked())),onEscape:requestBack,onPress:key=>{void wakeAudio();sound.keyDown(key);}});
+touchKeys=new TouchKeys({root:$('#touch-controls'),input,isEnabled:key=>mode!=='home'&&mode!=='closing'&&(key==='Escape'||(!blocked&&!powerInputBlocked())),onEscape:requestBack,onPress:key=>{void wakeAudio();if(coarse.matches)sound.keyDown(key);}});
 function openPhosphor(){
  if(mode!=='home'||historyTransition)return;
  sound.setOptions(options);void wakeAudio();powerSoundPending=true;power.reducedMotion=options.reducedMotion;power.startOn();nativeExitSeen=false;
@@ -125,9 +130,9 @@ function startSelected(){
 }
 document.addEventListener('keydown',e=>{
  if(e.ctrlKey||e.metaKey||e.altKey||mode==='home')return;
- if(e.code==='Escape'){e.preventDefault();if(!e.repeat){void wakeAudio();sound.keyDown('Escape');touchKeys.setPhysical(e.code,true);requestBack();}return;}
+ if(e.code==='Escape'){e.preventDefault();if(!e.repeat){void wakeAudio();if(coarse.matches)sound.keyDown('Escape');touchKeys.setPhysical(e.code,true);requestBack();}return;}
  const key=movementCodes[e.code];if(!key||blocked||powerInputBlocked()||mode==='closing')return;
- e.preventDefault();if(e.repeat)return;void wakeAudio();sound.keyDown(e.code);touchKeys.setPhysical(e.code,true);input.set('keyboard-'+e.code,[key]);
+ e.preventDefault();if(e.repeat)return;void wakeAudio();if(coarse.matches)sound.keyDown(e.code);touchKeys.setPhysical(e.code,true);input.set('keyboard-'+e.code,[key]);
 });
 document.addEventListener('keyup',e=>{touchKeys.setPhysical(e.code,false);if(movementCodes[e.code]){input.release('keyboard-'+e.code);if(mode!=='home')e.preventDefault();}});
 window.addEventListener('blur',()=>{sound.setScene(null,false);clearInput();if(mode==='game')paused=true;});
