@@ -178,7 +178,7 @@ export class AudioEngine {
  // above phone-speaker rolloff without introducing a fixed pitched oscillator.
  _tankRumble(variation){
   if(!this._ready('game'))return;
-  const c=this.ctx,d=2.8*variation,rate=c.sampleRate,count=Math.ceil(rate*d);
+  const c=this.ctx,d=1.4*variation,rate=c.sampleRate,count=Math.ceil(rate*d);
   const buffer=c.createBuffer(1,count,rate),data=buffer.getChannelData(0),body=new Float32Array(count);
   const coefficient=f=>1-Math.exp(-2*Math.PI*f/rate);
   const bassLP=coefficient(100*variation),bassHP=coefficient(28),bodyLP=coefficient(260*variation),bodyHP=coefficient(95);
@@ -203,7 +203,7 @@ export class AudioEngine {
    data[n]=(.9*bass*gust+.1*grain*gravel)*attack*decay*final;
   }
   data[0]=0;data[count-1]=0;
-  const source=c.createBufferSource(),gain=c.createGain(),filter=c.createBiquadFilter();source.buffer=buffer;gain.gain.value=.7;
+  const source=c.createBufferSource(),gain=c.createGain(),filter=c.createBiquadFilter();source.buffer=buffer;gain.gain.value=1.5;
   filter.type='lowpass';filter.frequency.value=230;filter.Q.value=.5;
   source.connect(filter);filter.connect(gain);gain.connect(this.buses.game);this._track(source,[source,filter,gain],'game',c.currentTime+d);source.start();source.stop(c.currentTime+d+.01);
  }

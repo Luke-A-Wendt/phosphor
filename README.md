@@ -6,7 +6,7 @@ Eight minimal arcade games behind curved green glass. **PHOSPHOR** draws its gam
 
 ## Open and play
 
-The home page is one black, full-page button. The glowing prompt says **CLICK TO OPEN PHOSPHOR** on desktop or **TAP TO OPEN PHOSPHOR** on touch devices. Click or tap anywhere on the page to enter fullscreen. The prompt stays centered in the visible page viewport as browser bars change. Everything else is inside the monitor.
+The home page is one black, full-page button. The glowing prompt says **CLICK HERE** on desktop or **TAP HERE** on touch devices. Click or tap anywhere on the page to enter fullscreen. The prompt uses the same green phosphor raster and bloom renderer as the PHOSPHOR menu title, on a black background. The prompt stays centered in the visible page viewport as browser bars change. Everything else is inside the monitor.
 
 Use **arrow keys (or WASD)** for movement and **Enter** as the action button. Select a game with up/down, then press Enter. Press Enter after a game ends to restart.
 

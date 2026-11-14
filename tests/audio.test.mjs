@@ -236,19 +236,19 @@ test('Tanks impacts roll like soft low thunder without a sharp attack or pitched
  let step=1;const {audio,c}=setup(()=>{step=(step*16807)%2147483647;return step/2147483647;});
  audio.setScene('tanks',true);const blast={};audio.update({id:'tanks',status:'won',blast},true);
  const voices=[...audio.voices];assert.ok(voices.length>=1);assert.ok(voices.every(v=>v.source.kind==='noise'));
- const ends=voices.map(v=>v.end);assert.ok(Math.max(...ends)>2.6&&Math.max(...ends)<3);
+ const ends=voices.map(v=>v.end);assert.ok(Math.max(...ends)>1.3&&Math.max(...ends)<1.5);
  assert.ok(c.nodes.some(n=>n.kind==='filter'&&n.type==='lowpass'&&n.frequency.value<=230),'impact is softly low-pass filtered');
- const rumble=voices.find(v=>v.source.buffer?.duration>2.5);assert.ok(rumble,'impact includes the long normalized pressure tail');
+ const rumble=voices.find(v=>v.source.buffer?.duration>1.3);assert.ok(rumble,'impact includes the long normalized pressure tail');
  const data=rumble.source.buffer.getChannelData(0);
  const rms=(start,end)=>{const block=data.subarray(start*c.sampleRate,end*c.sampleRate);return Math.sqrt(block.reduce((sum,x)=>sum+x*x,0)/block.length);};
- assert.equal(data[0],0);assert.ok(rms(1.2,1.7)>.04,'late rumble keeps meaningful energy instead of filtering it away');
- assert.ok(rms(2,2.3)>.02,'rumble remains audible before the shorter fade');
+ assert.equal(data[0],0);assert.ok(rms(.5,.8)>.04,'late rumble keeps meaningful energy instead of filtering it away');
+ assert.ok(rms(.9,1.1)>.02,'rumble remains audible before the shorter fade');
  const highpass=new Float32Array(data.length),alpha=1-Math.exp(-2*Math.PI*180/c.sampleRate);let low=0;
  for(let n=0;n<data.length;n++){low+=alpha*(data[n]-low);highpass[n]=data[n]-low;}
- const phone=highpass.subarray(2*c.sampleRate,3*c.sampleRate);
- assert.ok(Math.sqrt(phone.reduce((sum,x)=>sum+x*x,0)/phone.length)<rms(2,3),'low rumble dominates the upper frequencies');
+ const phone=highpass.subarray(.5*c.sampleRate,1.1*c.sampleRate);
+ assert.ok(Math.sqrt(phone.reduce((sum,x)=>sum+x*x,0)/phone.length)<rms(.5,1.1),'low rumble dominates the upper frequencies');
  assert.ok(c.buffers.every(b=>b.getChannelData(0).every(v=>Number.isFinite(v)&&Math.abs(v)<=1)));
- c.currentTime=2;c.finishVoices();const tail=[...audio.voices];assert.ok(tail.includes(rumble),'gravelly body and bass remain after the initial roar fades');
+ c.currentTime=1;c.finishVoices();const tail=[...audio.voices];assert.ok(tail.includes(rumble),'gravelly body and bass remain after the initial roar fades');
  const count=c.nodes.length;audio.update({id:'tanks',status:'won',blast},true);assert.equal(c.nodes.length,count,'winning impact is not retriggered');
  audio.update({id:'tanks',status:'playing',blast:null,turn:1},true);assert.ok(audio.voices.has(rumble),'opponent turn does not cut off the tail');
  audio.setScene('tanks',false);assert.equal(audio.voices.size,0);assert.ok(tail.every(v=>v.nodes.every(n=>n.disconnected)),'pause disposes the longer tail');

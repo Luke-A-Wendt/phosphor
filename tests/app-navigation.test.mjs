@@ -316,9 +316,9 @@ test('launcher identifies click or tap on first load and responds to input-devic
   const h=harness({mobile});
   const label=()=>h.elements.get('launch-label').textContent.toUpperCase();
   const accessible=()=>h.elements.get('open-phosphor').attributes['aria-label'].toUpperCase();
-  assert.equal(label(),mobile?'TAP TO OPEN PHOSPHOR':'CLICK TO OPEN PHOSPHOR');assert.equal(accessible(),label());
+  assert.equal(label(),mobile?'TAP HERE':'CLICK HERE');assert.equal(accessible(),label());
   h.media.get('(any-pointer: coarse)').matches=!mobile;h.media.get('(any-pointer: coarse)').dispatch('change');
-  assert.equal(label(),mobile?'CLICK TO OPEN PHOSPHOR':'TAP TO OPEN PHOSPHOR');assert.equal(accessible(),label());assert.equal(h.mode(),'home');assert.equal(h.depth(),0);
+  assert.equal(label(),mobile?'CLICK HERE':'TAP HERE');assert.equal(accessible(),label());assert.equal(h.mode(),'home');assert.equal(h.depth(),0);
  }
 });
 
@@ -512,4 +512,17 @@ test('desktop key input is silent while mobile retains keyboard sounds and its s
   assert.equal(h.voices.slice(start).some(v=>v.tag==='keyboard'),mobile);
   assert.equal(h.run("settings.rows.some(row=>row.key==='keyboardVolume')"),mobile);
  }
+});
+
+
+test('launcher uses the CRT renderer with green defaults on black and keeps it separate from game power',async()=>{
+ const h=harness();await h.advance(.1);
+ assert.equal(h.run('launchSource.width'),256);assert.equal(h.run('launchSource.height'),192);
+ assert.equal(h.run('launchRenderer.options.tint'),125);
+ assert.equal(h.run('launchRenderer.options.blackBackground'),true);
+ assert.equal(h.run('launchRenderer.options.ambient'),0);
+ assert.equal(h.run('launchRenderer.options.bloom'),normalizeSettings().bloom);
+ await h.launch();assert.equal(h.run('launchRenderer===renderer'),false);
+ await h.escape();assert.equal(h.mode(),'home');await h.advance(.1);
+ assert.equal(h.run('launchRenderer.options.tint'),125);
 });

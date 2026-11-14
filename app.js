@@ -15,7 +15,8 @@ const $=s=>document.querySelector(s);
 const app=$('#arcade'),launcher=$('#launcher'),launchButton=$('#open-phosphor');
 const source=document.createElement('canvas');source.width=256;source.height=192;
 const ctx=source.getContext('2d',{alpha:false});ctx.imageSmoothingEnabled=false;
-let canvas=$('#screen'),renderer=null;
+let canvas=$('#screen'),renderer=null,launchRenderer=null;
+const launchSource=document.createElement('canvas');launchSource.width=256;launchSource.height=192;
 const MENU_ITEMS=[...GAME_INFO,{id:'settings',name:'Settings'}];
 const input=new InputState(),menu=new MenuNavigation(MENU_ITEMS.length);
 const coarse=matchMedia('(any-pointer: coarse)'),portrait=matchMedia('(orientation: portrait)');
@@ -65,9 +66,9 @@ function updateOrientation(){
  const layout=solveViewportLayout({width:stageWidth,height:stageHeight,touch:coarse.matches,arrowsRight:options.arrowsRight,leftInset:inset(sideways?'top':'left'),rightInset:inset(sideways?'bottom':'right'),topInset:inset(sideways?'right':'top'),bottomInset:inset(sideways?'left':'bottom')});
  for(const name of ['screen','arrows','enter','escape'])for(const [field,value] of Object.entries(layout[name]))app.style.setProperty('--'+name+'-'+field,value+'px');
  app.style.setProperty('--key-size',layout.keySize+'px');app.style.setProperty('--key-gap',layout.keyGap+'px');
- const launchLabel=(coarse.matches?'Tap':'Click')+' to open Phosphor';
+ const launchLabel=(coarse.matches?'Tap':'Click')+' here';
  launchButton.setAttribute('aria-label',launchLabel);$('#launch-label').textContent=launchLabel.toUpperCase();
- drawLaunch($('#launch-mark').getContext('2d'),coarse.matches);
+ drawLaunch(launchSource.getContext('2d'),coarse.matches);if(mode==='home')launchRenderer?.resize();
  if(mode!=='home')renderer?.resize();
 }
 function ensureRenderer(){
@@ -165,7 +166,13 @@ function tick(dt){
  input.pressed.clear();
 }
 function frame(ms){
- if(mode==='home'){last=0;powerWasVisible=false;requestAnimationFrame(frame);return;}
+ if(mode==='home'){
+  if(!document.hidden){
+   if(!launchRenderer){launchRenderer=new CRTDisplay($('#launch-mark'),launchSource);launchRenderer.setOptions({...defaults(),ambient:0,reflection:0,environment:'none',blackBackground:true});}
+   launchRenderer.render(ms/1000,1/60);
+  }
+  last=0;powerWasVisible=false;requestAnimationFrame(frame);return;
+ }
  const now=ms/1000,elapsed=last?Math.max(0,now-last):1/60,dt=Math.min(elapsed,.05);last=now;clock+=dt;
  // Mobile fullscreen transitions can conceal the
  // display for seconds. Do not consume warm-up behind those surfaces.

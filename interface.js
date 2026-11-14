@@ -25,7 +25,7 @@ export function drawRoot(ctx,items,index,touch=false){
  pixelText(ctx,'ESC BACK',128,181,1,.42,'center');
 }
 export function drawLaunch(ctx,touch=false){
- ctx.clearRect(0,0,289,49);
- pixelText(ctx,touch?'TAP TO OPEN PHOSPHOR':'CLICK TO OPEN PHOSPHOR',144.5,17,3,1,'center');
- ctx.globalCompositeOperation='source-in';ctx.fillStyle='#66ff84';ctx.fillRect(0,0,289,49);ctx.globalCompositeOperation='source-over';
+ ctx.fillStyle='#000';ctx.fillRect(0,0,256,192);
+ // Same bitmap font, pixel scale and excitation as the root PHOSPHOR title.
+ pixelText(ctx,touch?'TAP HERE':'CLICK HERE',128,87,3,.94,'center');
 }

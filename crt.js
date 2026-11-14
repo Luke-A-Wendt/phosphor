@@ -485,6 +485,7 @@ void main(){color=texture(pixels,uv);}`);
     for(const key of ['brightness','persistence','bloom','curvature','glass','scanlines','ambient','reflection']){
       if(Number.isFinite(partial[key]))this.options[key]=Math.max(0,Math.min(2,partial[key]));
     }
+    if('blackBackground' in partial)this.options.blackBackground=Boolean(partial.blackBackground);
     if('tint' in partial)this.options.tint=normalizeTint(partial.tint);
     if(['none','diffuse','window','studio','observer','mixed'].includes(partial.environment))this.options.environment=partial.environment;
     if('reducedMotion' in partial)this.options.reducedMotion=Boolean(partial.reducedMotion);
@@ -555,14 +556,14 @@ void main(){color=texture(pixels,uv);}`);
     this._pass(this.programs.blur,this.glowTarget,{image:this.blurHalf.texture},{direction:[0,2.0/h]});
     this._pass(this.programs.blur,this.blurQuarter,{image:this.glowTarget.texture},{direction:[9.0/w,0]});
     this._pass(this.programs.blur,this.scatterTarget,{image:this.blurQuarter.texture},{direction:[0,9.0/h]});
-    this._pass(this.programs.composite,null,{beam:this.beamTarget.texture,glow:this.glowTarget.texture,scatter:this.scatterTarget.texture},{clock:this._clock,curvature:o.curvature,glass:o.glass,bloom:o.bloom,motion:o.reducedMotion?0:1,ambient:o.ambient,reflection:o.reflection,environmentMode:['none','diffuse','window','studio','observer','mixed'].indexOf(o.environment),resolution:[w,h],powerLevel:this.power.level,powerScale:[this.power.horizontal,this.power.vertical],powerSpot:this.power.spot,powerBend:this.power.bend||0,powerFocus:this.power.focus||0,phosphorSpectrum:colors.spectrum,glassTint:colors.glass,coatingTint:colors.coating,pageTint:colors.page.map(v=>v/255)});
+    this._pass(this.programs.composite,null,{beam:this.beamTarget.texture,glow:this.glowTarget.texture,scatter:this.scatterTarget.texture},{clock:this._clock,curvature:o.curvature,glass:o.glass,bloom:o.bloom,motion:o.reducedMotion?0:1,ambient:o.ambient,reflection:o.reflection,environmentMode:['none','diffuse','window','studio','observer','mixed'].indexOf(o.environment),resolution:[w,h],powerLevel:this.power.level,powerScale:[this.power.horizontal,this.power.vertical],powerSpot:this.power.spot,powerBend:this.power.bend||0,powerFocus:this.power.focus||0,phosphorSpectrum:colors.spectrum,glassTint:colors.glass,coatingTint:colors.coating,pageTint:o.blackBackground?[0,0,0]:colors.page.map(v=>v/255)});
   }
   _renderFallback(dt){
     const ctx=this.fallback;if(!ctx)return;
     const b=this._fallbackContext,o=this.options,w=this.canvas.width,h=this.canvas.height,colors=phosphorColors(o.tint);
     b.globalCompositeOperation='source-over';b.fillStyle=`rgba(0,0,0,${1-Math.exp(-dt/(0.022*Math.max(0.08,o.persistence)))})`;b.fillRect(0,0,256,192);
     b.globalCompositeOperation='lighter';b.globalAlpha=0.65;b.drawImage(this.source,0,0);b.globalAlpha=1;b.globalCompositeOperation='source-over';
-    ctx.fillStyle=colorCSS(colors.page);ctx.fillRect(0,0,w,h);ctx.save();
+    ctx.fillStyle=o.blackBackground?'#000':colorCSS(colors.page);ctx.fillRect(0,0,w,h);ctx.save();
     const r=w*0.025;ctx.beginPath();ctx.roundRect(w*0.025,h*0.025,w*0.95,h*0.95,r);ctx.clip();
     const power=this.power;ctx.save();ctx.translate(w/2,h/2);ctx.scale(power.horizontal,power.vertical);ctx.translate(-w/2,-h/2);
     const bend=power.bend||0,focus=power.focus||0,columns=bend>.00005?32:1;
