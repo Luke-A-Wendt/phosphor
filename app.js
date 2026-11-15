@@ -131,7 +131,7 @@ function startSelected(){
 }
 document.addEventListener('keydown',e=>{
  if(e.ctrlKey||e.metaKey||e.altKey||mode==='home')return;
- if(e.code==='Escape'){e.preventDefault();if(!e.repeat){void wakeAudio();if(coarse.matches)sound.keyDown('Escape');touchKeys.setPhysical(e.code,true);requestBack();}return;}
+ if(e.code==='Escape'||e.code==='KeyQ'){e.preventDefault();if(!e.repeat){void wakeAudio();if(coarse.matches)sound.keyDown('Escape');touchKeys.setPhysical(e.code,true);requestBack();}return;}
  const key=movementCodes[e.code];if(!key||blocked||powerInputBlocked()||mode==='closing')return;
  e.preventDefault();if(e.repeat)return;void wakeAudio();if(coarse.matches)sound.keyDown(e.code);touchKeys.setPhysical(e.code,true);input.set('keyboard-'+e.code,[key]);
 });

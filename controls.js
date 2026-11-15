@@ -1,5 +1,5 @@
 // Pure input helpers shared by keyboard, virtual stick and controller tests.
-export const movementCodes={KeyW:'ArrowUp',KeyA:'ArrowLeft',KeyS:'ArrowDown',KeyD:'ArrowRight',ArrowUp:'ArrowUp',ArrowLeft:'ArrowLeft',ArrowDown:'ArrowDown',ArrowRight:'ArrowRight',Space:'Space',Enter:'Space',NumpadEnter:'Space'};
+export const movementCodes={KeyW:'ArrowUp',KeyA:'ArrowLeft',KeyS:'ArrowDown',KeyD:'ArrowRight',ArrowUp:'ArrowUp',ArrowLeft:'ArrowLeft',ArrowDown:'ArrowDown',ArrowRight:'ArrowRight',Space:'Space',KeyE:'Space',Enter:'Space',NumpadEnter:'Space'};
 export function joystickDirections(x,y){
   if(Math.hypot(x,y)<.24)return [];
   const keys=[];

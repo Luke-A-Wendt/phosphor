@@ -526,3 +526,15 @@ test('launcher uses the CRT renderer with green defaults on black and keeps it s
  await h.escape();assert.equal(h.mode(),'home');await h.advance(.1);
  assert.equal(h.run('launchRenderer.options.tint'),125);
 });
+
+
+test('Q backs through game, settings and calibration; E activates and releases like Enter',async()=>{
+ const h=harness();await h.launch();h.key('KeyE');assert.equal(h.mode(),'game');
+ h.key('KeyQ');await h.settle();assert.equal(h.mode(),'menu');
+ h.key('ArrowUp');h.key('KeyE');assert.equal(h.mode(),'settings');
+ h.run("settings.index=settings.rows.findIndex(row=>row.key==='test')");h.key('KeyE');assert.equal(h.mode(),'test');
+ h.key('KeyQ');await h.settle();assert.equal(h.mode(),'settings');
+ h.key('KeyQ');await h.settle();assert.equal(h.mode(),'menu');
+ assert.equal(h.run('input.down.size'),0);
+ h.key('KeyQ');await h.advance(POWER_OFF_SECONDS+.1);assert.equal(h.mode(),'home');
+});

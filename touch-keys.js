@@ -54,7 +54,7 @@ export class TouchKeys {
   const button=this.buttonAt(e.target);if(!button||!this.isEnabled(button.dataset.key))return;
   this.press('assistive',button.dataset.key);this.release('assistive');
  }
- setPhysical(code,down){const key=code==='Escape'?'Escape':movementCodes[code];if(!key)return;if(down)this.physical.set(code,key);else this.physical.delete(code);this.paint();}
+ setPhysical(code,down){const key=(code==='Escape'||code==='KeyQ')?'Escape':movementCodes[code];if(!key)return;if(down)this.physical.set(code,key);else this.physical.delete(code);this.paint();}
  clear(){for(const id of this.pointers.keys())this.input.release(this.source(id));this.pointers.clear();this.physical.clear();this.paint();}
  destroy(){this.clear();for(const [event,handler] of this.listeners)this.root.removeEventListener(event,handler);this.listeners=[];}
 }
