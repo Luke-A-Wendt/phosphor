@@ -86,3 +86,27 @@ test('every encoded pipeline pass receives the same buffer mode',()=>{
   assert.deepEqual(uniforms,[['mode',byte?1:0]]);
  }
 });
+
+test('inlet receives the completed screen pass on both GPU paths and is bypassed by the launcher',()=>{
+ for(const monitorBorder of [false,true])for(const blackBackground of [false,true])for(const bytes of [false,true]){
+  const passes=[];let mipmaps=0;
+  const gl={bindVertexArray(){},activeTexture(){},bindTexture(){},pixelStorei(){},texSubImage2D(){},texParameteri(){},generateMipmap(){mipmaps++;}};
+  const target=name=>({name,texture:{name},width:800,height:600});
+  const renderer={gl,options:{tint:125,brightness:1.75,curvature:.75,glass:1.25,bloom:1.4,scanlines:1.6,ambient:1.5,reflection:1.45,environment:'diffuse',blackBackground,monitorBorder},
+   _byteTargets:bytes,source:{},power:{level:.4,horizontal:1,vertical:.05,spot:.1},states:[target('old'),target('new')],stateIndex:0,
+   programs:Object.fromEntries(['state','beam','blur','composite','inlet'].map(name=>[name,name])),
+   ...Object.fromEntries(['beamTarget','blurHalf','glowTarget','blurQuarter','scatterTarget','screenTarget'].map(name=>[name,target(name)])),
+   _pass(program,output,textures,uniforms){passes.push({program,output,textures,uniforms});}};
+  CRTDisplay.prototype.render.call(renderer,1,.016);
+  assert.equal(mipmaps,(blackBackground||!monitorBorder)?0:1,'only screen emission needs mip prefiltering');
+  const composite=passes.find(p=>p.program==='composite');
+  assert.equal(composite.uniforms.powerLevel,.4);assert.equal(composite.uniforms.powerScale[1],.05);
+  if(blackBackground||!monitorBorder){assert.equal(passes.at(-1),composite);assert.equal(composite.output,null);}
+  else{
+   assert.equal(composite.output,renderer.screenTarget);
+   const inlet=passes.at(-1);assert.equal(inlet.program,'inlet');assert.equal(inlet.output,null);
+   assert.equal(inlet.textures.screenImage,renderer.screenTarget.texture);
+   assert.deepEqual(inlet.uniforms.phosphorSpectrum,phosphorColors(125).spectrum);
+  }
+ }
+});

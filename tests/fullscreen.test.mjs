@@ -11,7 +11,7 @@ function fixture({supported=true,lock='allow',eventBeforeResolve=true,exitEventB
   const element={ownerDocument:doc,classList:{add:c=>classes.add(c),remove:c=>classes.delete(c),contains:c=>classes.has(c)}};
   const emit=()=>listeners.get('fullscreenchange')?.();
   if(supported)element.requestFullscreen=async options=>{requestCalls++;requestOptions=options;doc.fullscreenElement=element;if(eventBeforeResolve)emit();};
-  const controller=new FullscreenController({element,getMode:()=>mode,onBack:()=>{mode=mode==='test'?'settings':'menu';backCalls++;},onExit:()=>{mode='home';homeCalls++;},beforeExit,onNotice:n=>notices.push(n),focusElement:{focus(){focusCalls++;}},isMobile:()=>mobile});
+  const controller=new FullscreenController({element,getMode:()=>mode,onBack:()=>{mode=['test','controls'].includes(mode)?'settings':'menu';backCalls++;},onExit:()=>{mode='home';homeCalls++;},beforeExit,onNotice:n=>notices.push(n),focusElement:{focus(){focusCalls++;}},isMobile:()=>mobile});
   return {controller,doc,element,notices,emit,setMode:v=>mode=v,getMode:()=>mode,advance:ms=>now+=ms,browserExit(){doc.fullscreenElement=null;emit();},stats:()=>({backCalls,homeCalls,requestCalls,exitCalls,lockCalls,focusCalls,requestOptions,orientationLocks,orientationUnlocks})};
 }
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
@@ -215,4 +215,15 @@ test('a late mobile fullscreen entry during shutdown does not acquire locks or s
   assert.equal(f.getMode(),'closing');entered();await entering;await settle();
   assert.equal(f.controller.native,true);assert.equal(f.stats().homeCalls,0);assert.equal(f.stats().exitCalls,0);assert.equal(f.stats().lockCalls,0);assert.equal(f.stats().orientationLocks,0);
   finish();await leaving;assert.equal(f.getMode(),'home');assert.equal(f.controller.native,false);assert.equal(f.stats().exitCalls,1);assert.equal(f.stats().homeCalls,1);
+});
+
+
+test('controls returns to settings on Escape and browser-reserved fullscreen exit',async()=>{
+ for(const order of ['normal','keydown-first','native-first']){
+  const f=fixture({lock:'missing'});await f.controller.enter();f.setMode('controls');
+  if(order==='native-first'){f.browserExit();await f.controller.escape();}
+  else{await f.controller.escape();if(order==='keydown-first')f.browserExit();}
+  assert.equal(f.getMode(),'settings');assert.equal(f.stats().backCalls,1);
+  assert.equal(f.controller.isImmersive(),true);
+ }
 });

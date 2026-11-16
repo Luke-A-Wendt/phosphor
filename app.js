@@ -6,6 +6,7 @@ import {CRTDisplay} from './crt.js';
 import {FullscreenController} from './fullscreen.js';
 import {normalizeSettings} from './display-settings.js';
 import {SettingsScreen} from './settings-screen.js';
+import {drawControls,CONTROLS_DESCRIPTION} from './controls-screen.js';
 import {drawCalibration,TEST_PATTERNS} from './calibration.js';
 import {drawRoot,drawLaunch,GAME_HINTS} from './interface.js';
 import {movementCodes,InputState,MenuNavigation} from './controls.js';
@@ -37,20 +38,21 @@ const settings=new SettingsScreen({mobile:coarse.matches,options,defaults:defaul
  const layoutChanged=next.arrowsRight!==options.arrowsRight;
  options=normalizeSettings(next,reducedMotion);renderer?.setOptions(options);sound.setOptions(options);power.reducedMotion=options.reducedMotion;
  if(layoutChanged)updateOrientation();
-},onTest:showTest,onDegauss:()=>{if(renderer?.degauss?.()){sound.degauss();}}});
+},onTest:showTest,onControls:showControls,onDegauss:()=>{if(renderer?.degauss?.()){sound.degauss();}}});
 
 function wakeAudio(){sound.setHidden(Boolean(document.hidden));return document.hidden?Promise.resolve(false):sound.unlock();}
 function clearInput(){input.clear();menu.release();settings.release();touchKeys?.clear();}
 function announce(text){$('#status').textContent=text;}
 function syncInterface(){
  app.dataset.mode=mode;
- const labels={home:'Open Phosphor',closing:'Powering off',menu:'PHOSPHOR menu. '+MENU_ITEMS[menu.index].name+'. Up and down select, Enter opens, Escape goes back.',settings:'Settings. '+settings.selectionLabel+'. Up and down select, left and right adjust, Enter activates, Escape goes back.',test:'Calibration. Enter changes the test, Escape returns to settings.',game:game?game.id+'. '+GAME_HINTS[game.id]+'. Escape returns to menu.':''};
+ const labels={home:'Open Phosphor',closing:'Powering off',menu:'PHOSPHOR menu. '+MENU_ITEMS[menu.index].name+'. Up and down select, Enter opens, Escape goes back.',settings:'Settings. '+settings.selectionLabel+'. Up and down select, left and right adjust, Enter activates, Escape goes back.',controls:CONTROLS_DESCRIPTION,test:'Calibration. Enter changes the test, Escape returns to settings.',game:game?game.id+'. '+GAME_HINTS[game.id]+'. Escape returns to menu.':''};
  canvas.setAttribute('aria-label',labels[mode]);
- $('#menu-back').setAttribute('aria-label',mode==='test'?'Back to settings':mode==='menu'?'Exit Phosphor':'Back to menu');
+ $('#menu-back').setAttribute('aria-label',['test','controls'].includes(mode)?'Back to settings':mode==='menu'?'Exit Phosphor':'Back to menu');
  announce(labels[mode]);
 }
 function updateOrientation(){
  settings.setMobile(coarse.matches);
+ if(mode==='controls'&&coarse.matches)openSettings();
  const viewport=window.visualViewport;
  const width=viewport?.width>0?viewport.width:window.innerWidth;
  const height=viewport?.height>0?viewport.height:window.innerHeight;
@@ -92,7 +94,8 @@ function returnHome(){
 function toMenu(){sound.setScene(null,false);mode='menu';game=null;paused=false;clearInput();lastSelection=-1;syncInterface();}
 function openSettings(){sound.setScene(null,false);mode='settings';game=null;paused=false;clearInput();lastSetting='';settings.setOptions(options);syncInterface();}
 function showTest(){mode='test';clearInput();syncInterface();}
-function goBack(){if(mode==='test')openSettings();else if(mode==='game'||mode==='settings')toMenu();}
+function showControls(){if(coarse.matches)return;mode='controls';clearInput();syncInterface();}
+function goBack(){if(mode==='test'||mode==='controls')openSettings();else if(mode==='game'||mode==='settings')toMenu();}
 function beginClose(){
  if(closePromise)return closePromise;
  clearInput();sound.setScene(null,false);if(!powerSoundPending)sound.powerOff();powerSoundPending=false;power.startOff();
@@ -143,6 +146,7 @@ function draw(){
  ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.imageSmoothingEnabled=false;
  if(mode==='menu'){drawRoot(ctx,MENU_ITEMS,menu.index,coarse.matches);return;}
  if(mode==='settings'){settings.render(ctx,coarse.matches);return;}
+ if(mode==='controls'){drawControls(ctx,new Set([...input.sources.keys()].filter(key=>key.startsWith('keyboard-')).map(key=>key.slice(9))));return;}
  if(mode==='test'){drawCalibration(ctx,clock,testPattern,coarse.matches);return;}
  if(mode!=='game')return;
  game.render(ctx);

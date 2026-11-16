@@ -6,6 +6,7 @@ const ENVIRONMENT_LABELS={none:'OFF',diffuse:'SOFT ROOM',window:'DAYLIGHT',studi
 const ROWS=[
  {key:'test',label:'DISPLAY TEST',note:'GRID / FOCUS / MOTION',type:'action'},
  {key:'tint',label:'TINT',note:'MONOCHROME HUE / GREEN 125 DEG',max:360,step:5},
+ {key:'monitorBorder',label:'MONITOR BORDER',note:'REFLECTIVE INNER BEZEL',type:'boolean'},
  {key:'environment',label:'ENVIRONMENT',note:'SOFT LIGHT AROUND THE GLASS',type:'environment'},
  {key:'ambient',label:'AMBIENT LIGHT',note:'DARK ROOM < > LIT ROOM'},
  {key:'reflection',label:'REFLECTION',note:'ENVIRONMENTAL GLARE'},
@@ -17,6 +18,7 @@ const ROWS=[
  {key:'glass',label:'GLASS DEPTH',max:2,note:'GLASS THICKNESS AND REFRACTION'},
  {key:'reducedMotion',label:'STABLE DISPLAY',note:'REDUCES RASTER FLUCTUATION',type:'boolean'},
  {key:'degauss',label:'DEGAUSS',note:'DEMAGNETIZE / ENTER TO ACTIVATE',type:'action'},
+ {key:'controls',label:'CONTROLS',note:'KEYBOARD MAP / ALL KEY BINDINGS',type:'action',browserOnly:true},
  {key:'musicVolume',label:'MUSIC',note:'GAME MUSIC / ZERO MUTES',max:1},
  {key:'gameVolume',label:'GAME SOUNDS',note:'GAME EFFECTS / ZERO MUTES',max:1},
  {key:'monitorVolume',label:'MONITOR SOUNDS',note:'CRT POWER AND HUM / ZERO MUTES',max:1},
@@ -29,16 +31,16 @@ const fill=(ctx,x,y,w,h,intensity)=>{const value=Math.round(intensity*255);ctx.f
 
 /** Keyboard and joystick operated settings, drawn into the same phosphor raster. */
 export class SettingsScreen {
- constructor({mobile=false,options=DISPLAY_DEFAULTS,onChange=()=>{},onTest=()=>{},onDegauss=()=>{},defaults=DISPLAY_DEFAULTS}={}){
+ constructor({mobile=false,options=DISPLAY_DEFAULTS,onChange=()=>{},onTest=()=>{},onControls=()=>{},onDegauss=()=>{},defaults=DISPLAY_DEFAULTS}={}){
   this.options=normalizeSettings(options);this.defaults=normalizeSettings(defaults);
-  this.onChange=onChange;this.onTest=onTest;this.onDegauss=onDegauss;
-  this.rows=ROWS.filter(row=>!row.mobileOnly||mobile);
+  this.onChange=onChange;this.onTest=onTest;this.onControls=onControls;this.onDegauss=onDegauss;
+  this.rows=ROWS.filter(row=>(!row.mobileOnly||mobile)&&(!row.browserOnly||!mobile));
   this.navigation=new MenuNavigation(this.rows.length);
   this.adjustDirection=0;this.adjustClock=0;this.top=0;
  }
  setMobile(mobile){
   const key=this.rows[this.index].key;
-  this.rows=ROWS.filter(row=>!row.mobileOnly||mobile);this.navigation.count=this.rows.length;
+  this.rows=ROWS.filter(row=>(!row.mobileOnly||mobile)&&(!row.browserOnly||!mobile));this.navigation.count=this.rows.length;
   const index=this.rows.findIndex(row=>row.key===key);this.index=index<0?Math.min(this.index,this.rows.length-1):index;
  }
  get index(){return this.navigation.index;}
@@ -72,6 +74,7 @@ export class SettingsScreen {
   const row=this.rows[this.index];
   if(row.key==='degauss'){this.release();this.onDegauss();}
   else if(row.key==='test'){this.release();this.onTest();}
+  else if(row.key==='controls'){this.release();this.onControls();}
   else if(row.key==='reset')this.change({...this.defaults});
   else if(row.type==='boolean')this.change({...this.options,[row.key]:!this.options[row.key]});
   else this.adjust(1);

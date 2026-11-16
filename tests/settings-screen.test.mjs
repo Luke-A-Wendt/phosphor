@@ -14,13 +14,13 @@ function harness(options=DISPLAY_DEFAULTS){
 }
 
 test('settings preserve short joystick taps and repeat held adjustments after a delay',()=>{
- const h=harness();h.screen.index=3;h.tap('ArrowRight');assert.equal(h.screen.options.ambient,1.55);
+ const h=harness();h.screen.index=4;h.tap('ArrowRight');assert.equal(h.screen.options.ambient,1.55);
  h.input.set('stick',['ArrowRight']);h.frame();assert.equal(h.screen.options.ambient,1.6);
  for(let n=0;n<30;n++)h.frame();assert.equal(h.screen.options.ambient,1.6);
  for(let n=0;n<30;n++)h.frame();assert.ok(h.screen.options.ambient>1.6);
  h.input.clear();h.screen.release();h.frame();const value=h.screen.options.ambient;
  for(let n=0;n<60;n++)h.frame();assert.equal(h.screen.options.ambient,value);
- h.tap('ArrowDown');assert.equal(h.screen.index,4);h.tap('ArrowLeft');assert.equal(h.screen.options.reflection,1.4);
+ h.tap('ArrowDown');assert.equal(h.screen.index,5);h.tap('ArrowLeft');assert.equal(h.screen.options.reflection,1.4);
 });
 
 test('numeric bounds, opposite directions, and diagonal navigation are safe',()=>{
@@ -32,11 +32,11 @@ test('numeric bounds, opposite directions, and diagonal navigation are safe',()=
 });
 
 test('environment and stable display use directions and the single action button',()=>{
- const h=harness();h.screen.index=2;assert.equal(h.screen.index,2);
+ const h=harness();h.screen.index=3;assert.equal(h.screen.index,3);
  h.tap('ArrowLeft');assert.equal(h.screen.options.environment,'none');
  h.tap('ArrowLeft');assert.equal(h.screen.options.environment,'mixed');
  h.tap('Space');assert.equal(h.screen.options.environment,'none');
- for(let n=0;n<9;n++)h.tap('ArrowDown');assert.equal(h.screen.index,11);
+ for(let n=0;n<9;n++)h.tap('ArrowDown');assert.equal(h.screen.index,12);
  h.tap('ArrowRight');assert.equal(h.screen.options.reducedMotion,true);
  h.tap('Space');assert.equal(h.screen.options.reducedMotion,false);
  h.tap('ArrowRight');h.tap('ArrowLeft');assert.equal(h.screen.options.reducedMotion,false);
@@ -106,7 +106,7 @@ test('sound labels, mobile visibility and display test order match the settings 
   assert.deepEqual(keys.slice(-tail.length),tail);
   assert.equal(keys.includes('keyboardVolume'),mobile);
   assert.equal(keys.includes('arrowsRight'),mobile);
-  assert.deepEqual(keys.slice(0,3),['test','tint','environment']);
+  assert.deepEqual(keys.slice(0,4),['test','tint','monitorBorder','environment']);
   if(mobile){screen.index=keys.indexOf('keyboardVolume');assert.equal(screen.selectionLabel,'KEYBOARD SOUNDS: 50%');}
   screen.setMobile(!mobile);assert.equal(screen.rows.some(r=>r.key==='keyboardVolume'),!mobile);
   assert.ok(screen.index<screen.rows.length);assert.equal(screen.navigation.count,screen.rows.length);
@@ -141,4 +141,24 @@ test('curvature and glass depth reach 200 percent and clamp there',()=>{
   assert.equal(h.screen.options[key],2);assert.match(h.screen.selectionLabel,/200%/);
   h.tap('ArrowRight');assert.equal(h.screen.options[key],2);
  }
+});
+
+test('monitor border toggles immediately and resets to on',()=>{
+ const h=harness();h.screen.index=h.screen.rows.findIndex(row=>row.key==='monitorBorder');
+ assert.equal(h.screen.selectionLabel,'MONITOR BORDER: ON');
+ h.tap('ArrowLeft');assert.equal(h.changes.at(-1).monitorBorder,false);
+ h.tap('Space');assert.equal(h.screen.options.monitorBorder,true);
+ h.tap('Space');assert.equal(h.screen.options.monitorBorder,false);
+ h.screen.index=h.screen.rows.findIndex(row=>row.key==='reset');h.tap('Space');
+ assert.equal(h.screen.options.monitorBorder,true);
+});
+
+
+test('controls action is browser-only, opens once and preserves settings values',()=>{
+ let opened=0;const screen=new SettingsScreen({onControls:()=>opened++});
+ screen.index=screen.rows.findIndex(row=>row.key==='controls');const before={...screen.options};
+ screen.adjust(1);assert.equal(opened,0);screen.activate();assert.equal(opened,1);
+ assert.deepEqual(screen.options,before);assert.equal(screen.selectionLabel,'CONTROLS');
+ screen.setMobile(true);assert.equal(screen.rows.some(row=>row.key==='controls'),false);
+ screen.setMobile(false);assert.equal(screen.rows.filter(row=>row.key==='controls').length,1);
 });

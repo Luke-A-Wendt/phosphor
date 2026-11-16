@@ -33,7 +33,7 @@ The menu hint is **ESC BACK**. Escape and the mobile ESC button have the same be
 | --- | --- |
 | Game | Root menu |
 | Settings | Root menu |
-| Calibration test | Settings, retaining the selected row |
+| Calibration test or Controls | Settings, retaining the selected row |
 | Root menu | Black home page, exiting fullscreen |
 
 Returning to the home page resets every display setting to its default. Settings last only for the current visit inside the monitor. High scores are retained.
@@ -44,8 +44,9 @@ In browsers that permit keyboard locking, nested back navigation stays in native
 
 Select **Settings** from the root menu. The controls are phosphor pixels rendered behind the glass; there are no HTML settings panels or pop-up windows.
 
-Use up/down to select a setting, left/right to adjust it, and Enter to activate it. The list scrolls as you move. **Display test** is available only from settings, directly below **Stable display**. Enter cycles its grid/levels, beam/focus, and motion/decay patterns; Escape returns to settings.
+Use up/down to select a setting, left/right to adjust it, and Enter to activate it. The list scrolls as you move. **Display test** is available only from settings, at the top of the list. Enter cycles its grid/levels, beam/focus, and motion/decay patterns; Escape returns to settings.
 
+- **Controls** (browser only) opens a glowing keyboard diagram of WASD, arrows, E, Enter, numpad Enter, Space, Q, and Escape. Held movement/action keys light up; Escape or Q returns to Settings.
 - **Tint** selects the monochrome hue across the full color wheel. The default is the original green; glow, line/spot decay and glass tones follow the selected tint. Reset settings or exit to Home restores green.
 - **Ambient light** ranges from a dark room to an illuminated room, raising the textured phosphor surface's black level along with reflected light.
 - **Reflection** controls environmental glare independently. Environments are **Off**, **Soft room**, **Daylight**, **Desk light**, **Observer**, and **Mixed light**. The observer is a faint procedural silhouette; no camera is used.
@@ -85,6 +86,7 @@ The dependency-free WebGL2 renderer combines:
 - Fixed phosphor texture behind a separate glass surface.
 - Finite-thickness curved glass, ray intersections, Snell refraction, Fresnel reflection/transmission, and path-dependent absorption.
 - Faint internal reflections, surface marks, and subtle procedural room lighting.
+- A molded, sloping inner bezel with a gently bowed glass opening, tight interior corners, joined planar faces, narrow edge chamfers, and a dark contact seam. Fine grain, small surface pits, and rough dielectric reflections give the recess a worn material finish. Nearby phosphor emission lights the recess locally; weaker light arrives from the rest of the screen. Its reflections follow the selected tint and power sequence. The inset fits within the existing footprint, without a monitor cabinet; mobile key size and placement are unchanged.
 - Multiple scales of light scatter and glow, monochrome green emission, and no RGB shadow mask.
 
 There is no monitor housing or bezel. This is a **physically informed visual model**, not a calibrated reproduction of a measured tube. Material and phosphor parameters are modeled choices. It does not simulate individual electrons, detailed deflection circuitry, permanent burn-in, or measured emission spectra. Asteroids uses this raster rather than a historical vector display.
@@ -129,6 +131,7 @@ Tests cover game progression and collisions, Tetris visibility after line clears
 | `audio.js` | Procedural keyboard, monitor, game audio, and Tetris music |
 | `power-sequence.js` | Warm-up and shutdown timing |
 | `fullscreen.js` | Native fullscreen, keyboard locking, and expanded-view fallback |
+| `controls-screen.js` | Browser keyboard diagram and live key highlights |
 | `settings-screen.js` | Pixel settings navigation and rendering |
 | `display-settings.js` | Defaults and numeric validation |
 | `calibration.js` | Grid, beam, and motion test patterns |

@@ -24,7 +24,7 @@ export class FullscreenController {
   get expanded(){return this.element.classList.contains('immersive');}
   isImmersive(){return this.native||this.expanded;}
   _now(){return this.view.performance?.now?.()??Date.now();}
-  _isChild(){return ['game','settings','test'].includes(this.getMode());}
+  _isChild(){return ['game','settings','test','controls'].includes(this.getMode());}
   _completeExit(){
     if(this._exitDelivered)return;
     this._exitDelivered=true;

@@ -6,6 +6,7 @@ import {createGame,GAME_INFO,pixelText} from '../games.js';
 import {FullscreenController} from '../fullscreen.js';
 import {normalizeSettings} from '../display-settings.js';
 import {SettingsScreen} from '../settings-screen.js';
+import {drawControls,CONTROLS_DESCRIPTION} from '../controls-screen.js';
 import {drawCalibration,TEST_PATTERNS} from '../calibration.js';
 import {drawRoot,drawLaunch,GAME_HINTS} from '../interface.js';
 import {movementCodes,InputState,MenuNavigation} from '../controls.js';
@@ -86,7 +87,7 @@ function harness({mobile=false,width=800,height=400,viewport={},safeArea={},redu
  const media=new Map();
  function matchMedia(query){if(!media.has(query)){const entry=new Events();entry.matches=query==='(any-pointer: coarse)'?mobile:query==='(prefers-reduced-motion: reduce)'?reducedMotion:false;media.set(query,entry);}return media.get(query);}
  class CRTStub{constructor(canvas){this.canvas=canvas;this.backend='WebGL test stub';}setOptions(o){this.options={...o};}setPower(p){this.power={...p};}resize(){resizeCount++;}render(){renderedPowers.push({...this.power});}destroy(){destroyed++;}}
- const sandbox={document:doc,window:win,navigator:win.navigator,screen:win.screen,history,matchMedia,requestAnimationFrame:win.requestAnimationFrame,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},console,Date,createGame,GAME_INFO,pixelText,CRTDisplay:CRTStub,FullscreenController,normalizeSettings,SettingsScreen,drawCalibration,TEST_PATTERNS,drawRoot,drawLaunch,GAME_HINTS,movementCodes,InputState,MenuNavigation,AudioEngine:TestAudioEngine,TouchKeys,PowerSequence,solveViewportLayout};
+ const sandbox={document:doc,window:win,navigator:win.navigator,screen:win.screen,history,matchMedia,requestAnimationFrame:win.requestAnimationFrame,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},console,Date,createGame,GAME_INFO,pixelText,CRTDisplay:CRTStub,FullscreenController,normalizeSettings,SettingsScreen,drawControls,CONTROLS_DESCRIPTION,drawCalibration,TEST_PATTERNS,drawRoot,drawLaunch,GAME_HINTS,movementCodes,InputState,MenuNavigation,AudioEngine:TestAudioEngine,TouchKeys,PowerSequence,solveViewportLayout};
  const context=vm.createContext(sandbox);
  const source=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8').replace(/^import .*;\n/gm,'');
  vm.runInContext('"use strict";\n'+source,context,{filename:'app.js'});
@@ -537,4 +538,31 @@ test('Q backs through game, settings and calibration; E activates and releases l
  h.key('KeyQ');await h.settle();assert.equal(h.mode(),'menu');
  assert.equal(h.run('input.down.size'),0);
  h.key('KeyQ');await h.advance(POWER_OFF_SECONDS+.1);assert.equal(h.mode(),'home');
+});
+
+
+test('desktop controls diagram is nested under settings and shows held physical keys without gameplay',async()=>{
+ const h=harness();await h.launch();h.key('ArrowUp');h.key('Enter');
+ h.run("settings.index=settings.rows.findIndex(row=>row.key==='controls')");
+ const selected=h.run('settings.index');h.key('Enter');assert.equal(h.mode(),'controls');
+ assert.match(h.elements.get('screen').attributes['aria-label'],/numpad Enter/);
+ for(const code of ['KeyW','ArrowLeft','Space','Enter','NumpadEnter','KeyE']){
+  h.keyDown(code);h.tick();assert.equal(h.mode(),'controls');
+  assert.equal(h.run("input.sources.has('keyboard-"+code+"')"),true);
+  h.keyUp(code);h.tick();assert.equal(h.run('input.down.size'),0);
+ }
+ assert.equal(h.run('game'),null);
+ h.key('KeyQ');assert.equal(h.mode(),'settings');assert.equal(h.run('settings.index'),selected);
+ assert.equal(h.doc.fullscreenElement,h.elements.get('arcade'));
+ h.key('Enter');assert.equal(h.mode(),'controls');await h.escape();assert.equal(h.mode(),'settings');
+ await h.escape();assert.equal(h.mode(),'menu');
+});
+
+test('controls is hidden on mobile and closes back to settings if input mode changes',async()=>{
+ const mobile=harness({mobile:true});await mobile.launch();
+ assert.equal(mobile.run("settings.rows.some(row=>row.key==='controls')"),false);
+ mobile.run('showControls()');assert.equal(mobile.mode(),'menu');
+ const h=harness();await h.launch();h.run('openSettings();showControls()');assert.equal(h.mode(),'controls');
+ const media=h.media.get('(any-pointer: coarse)');media.matches=true;media.dispatch('change');
+ assert.equal(h.mode(),'settings');assert.equal(h.run("settings.rows.some(row=>row.key==='controls')"),false);
 });

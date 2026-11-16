@@ -15,6 +15,8 @@
  * 15.72 kHz sweeps. Fast/slow decay constants are illustrative green phosphor.
  */
 
+import {INLET} from './inlet-shader.js';
+import {drawInletFallback} from './inlet.js';
 import {DEFAULT_TINT,normalizeTint,phosphorColors,colorCSS} from './phosphor-color.js';
 
 const VS = `#version 300 es
@@ -233,7 +235,7 @@ void main(){
   vec3 page=pageTint;
   float c=clamp(curvature,0.0,2.0),g=clamp(glass,0.0,2.0);
   float aa=max(0.0005,2.0/resolution.y);
-  float outerDistance=roundedBox(p,vec2(1.308,0.975),0.112);
+  float outerDistance=roundedBox(p,vec2(1.308,0.975),0.052);
   float outerMask=1.0-smoothstep(-aa,aa,outerDistance);
   // Avoid huge radii at zero curvature while retaining a virtually flat mode.
   float outerRadius=max(1.95-0.10*max(0.0,c-2.0),3.15/max(0.04,c));
@@ -361,7 +363,8 @@ void main(){
   vec3 linearLight=energy*phosphorSpectrum+(reflected+edgeDepth)*glassTint+ambientCoating*coatingTint;
   vec3 surface=encodeDisplay(linearLight);
   float spill=(1.0-outerMask)*exp(-max(0.0,outerDistance)*95.0)*wide*bloom*0.008;
-  color=vec4(mix(page,surface,outerMask)+encodeDisplay(spill*phosphorSpectrum),1.0);
+  // Preserve phosphor-only radiance for the local inlet reflection pass.
+  color=vec4(mix(page,surface,outerMask)+encodeDisplay(spill*phosphorSpectrum),1.0-exp(-max(energy,0.0)*outerMask*0.5));
 }`;
 
 function shader(gl,type,source){
@@ -385,7 +388,7 @@ function program(gl,fragment){
 export class CRTDisplay {
   constructor(canvas,sourceCanvas){
     this.canvas=canvas; this.source=sourceCanvas;this.power={level:1,vertical:1,horizontal:1,spot:0};
-    this.options={tint:DEFAULT_TINT,brightness:1.75,persistence:1,bloom:1.4,curvature:.75,glass:1.25,scanlines:1.6,ambient:1.5,reflection:1.45,environment:'diffuse',reducedMotion:false};
+    this.options={monitorBorder:true,tint:DEFAULT_TINT,brightness:1.75,persistence:1,bloom:1.4,curvature:.75,glass:1.25,scanlines:1.6,ambient:1.5,reflection:1.45,environment:'diffuse',reducedMotion:false};
     this._backend='Canvas 2D fallback'; this._targets=[]; this._programs=[]; this._destroyed=false;
     this._contextLost=false; this._lostHandler=e=>{e.preventDefault();this._contextLost=true;this._backend='WebGL context lost';};
     this._restoreHandler=()=>{this._contextLost=false;this.gl=this.gl||this._blitGL;this._blitGL=null;try{this._initGL();this.resize();}catch(e){this._fallback(e);}};
@@ -407,7 +410,7 @@ export class CRTDisplay {
     this._targets=[];this._programs=[];
     gl.disable(gl.DEPTH_TEST);gl.disable(gl.BLEND);gl.disable(gl.CULL_FACE);
     this.vao=gl.createVertexArray();gl.bindVertexArray(this.vao);
-    this.programs={state:program(gl,STATE),beam:program(gl,BEAM),blur:program(gl,BLUR),composite:program(gl,COMPOSITE)};
+    this.programs={state:program(gl,STATE),beam:program(gl,BEAM),blur:program(gl,BLUR),composite:program(gl,COMPOSITE),inlet:program(gl,INLET)};
     this._programs=Object.values(this.programs);
     this.inputTexture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,this.inputTexture);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
@@ -497,6 +500,7 @@ void main(){color=texture(pixels,uv);}`);
     for(const key of ['brightness','persistence','bloom','curvature','glass','scanlines','ambient','reflection']){
       if(Number.isFinite(partial[key]))this.options[key]=Math.max(0,Math.min(2,partial[key]));
     }
+    if('monitorBorder' in partial)this.options.monitorBorder=Boolean(partial.monitorBorder);
     if('blackBackground' in partial)this.options.blackBackground=Boolean(partial.blackBackground);
     if('tint' in partial)this.options.tint=normalizeTint(partial.tint);
     if(['none','diffuse','window','studio','observer','mixed'].includes(partial.environment))this.options.environment=partial.environment;
@@ -516,8 +520,9 @@ void main(){color=texture(pixels,uv);}`);
     if(this._fallbackOutput){this._fallbackOutput.width=width;this._fallbackOutput.height=height;}
     if(this.gl&&!this._contextLost){
       try{
-        for(const key of ['beamTarget','blurHalf','glowTarget','blurQuarter','scatterTarget'])this._deleteTarget(this[key]);
+        for(const key of ['beamTarget','blurHalf','glowTarget','blurQuarter','scatterTarget','screenTarget'])this._deleteTarget(this[key]);
         this.beamTarget=this._target(width,height);
+        this.screenTarget=this._target(width,height);
         const hw=Math.max(1,Math.floor(width/2)),hh=Math.max(1,Math.floor(height/2)),qw=Math.max(1,Math.floor(width/4)),qh=Math.max(1,Math.floor(height/4));
         this.blurHalf=this._target(hw,hh);this.glowTarget=this._target(hw,hh);
         this.blurQuarter=this._target(qw,qh);this.scatterTarget=this._target(qw,qh);
@@ -573,7 +578,15 @@ void main(){color=texture(pixels,uv);}`);
     this._pass(this.programs.blur,this.glowTarget,{image:this.blurHalf.texture},{direction:[0,2.0/h]});
     this._pass(this.programs.blur,this.blurQuarter,{image:this.glowTarget.texture},{direction:[9.0/w,0]});
     this._pass(this.programs.blur,this.scatterTarget,{image:this.blurQuarter.texture},{direction:[0,9.0/h]});
-    this._pass(this.programs.composite,null,{beam:this.beamTarget.texture,glow:this.glowTarget.texture,scatter:this.scatterTarget.texture},{clock:this._clock,curvature:o.curvature,glass:o.glass,bloom:o.bloom,motion:o.reducedMotion?0:1,degaussTime:this._degaussTime??3,ambient:o.ambient,reflection:o.reflection,environmentMode:['none','diffuse','window','studio','observer','mixed'].indexOf(o.environment),resolution:[w,h],powerLevel:this.power.level,powerScale:[this.power.horizontal,this.power.vertical],powerSpot:this.power.spot,powerBend:this.power.bend||0,powerFocus:this.power.focus||0,phosphorSpectrum:colors.spectrum,glassTint:colors.glass,coatingTint:colors.coating,pageTint:o.blackBackground?[0,0,0]:colors.page.map(v=>v/255)});
+    this._pass(this.programs.composite,(o.blackBackground||o.monitorBorder===false)?null:this.screenTarget,{beam:this.beamTarget.texture,glow:this.glowTarget.texture,scatter:this.scatterTarget.texture},{clock:this._clock,curvature:o.curvature,glass:o.glass,bloom:o.bloom,motion:o.reducedMotion?0:1,degaussTime:this._degaussTime??3,ambient:o.ambient,reflection:o.reflection,environmentMode:['none','diffuse','window','studio','observer','mixed'].indexOf(o.environment),resolution:[w,h],powerLevel:this.power.level,powerScale:[this.power.horizontal,this.power.vertical],powerSpot:this.power.spot,powerBend:this.power.bend||0,powerFocus:this.power.focus||0,phosphorSpectrum:colors.spectrum,glassTint:colors.glass,coatingTint:colors.coating,pageTint:o.blackBackground?[0,0,0]:colors.page.map(v=>v/255)});
+    if(!o.blackBackground&&o.monitorBorder!==false){
+      // The lip integrates filtered emitting patches; the glass itself is
+      // still sampled explicitly at full resolution in the final pass.
+      gl.bindTexture(gl.TEXTURE_2D,this.screenTarget.texture);
+      gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      this._pass(this.programs.inlet,null,{screenImage:this.screenTarget.texture},{resolution:[w,h],phosphorSpectrum:colors.spectrum,pageTint:colors.page.map(v=>v/255),ambient:o.ambient});
+    }
   }
   _renderFallback(dt){
     const ctx=this.fallback;if(!ctx)return;
@@ -581,7 +594,7 @@ void main(){color=texture(pixels,uv);}`);
     b.globalCompositeOperation='source-over';b.fillStyle=`rgba(0,0,0,${1-Math.exp(-dt/(0.022*Math.max(0.08,o.persistence)))})`;b.fillRect(0,0,256,192);
     b.globalCompositeOperation='lighter';b.globalAlpha=0.65;b.drawImage(this.source,0,0);b.globalAlpha=1;b.globalCompositeOperation='source-over';
     ctx.fillStyle=o.blackBackground?'#000':colorCSS(colors.page);ctx.fillRect(0,0,w,h);ctx.save();
-    const r=w*0.025;ctx.beginPath();ctx.roundRect(w*0.025,h*0.025,w*0.95,h*0.95,r);ctx.clip();
+    const r=h*.026;ctx.beginPath();ctx.roundRect(w*.0095,h*.0125,w*.981,h*.975,r);ctx.clip();
     const power=this.power;ctx.save();ctx.translate(w/2,h/2);ctx.scale(power.horizontal,power.vertical);ctx.translate(-w/2,-h/2);
     const dg=this._degaussTime??3,curve=.06*Math.max(0,Math.min(2,o.curvature||0));
     const bend=(power.bend||0)+(o.reducedMotion?0:.05*Math.sin(dg*47)*Math.exp(-dg*2.2)*Math.max(0,1-dg/2.4)),focus=power.focus||0,columns=Math.abs(bend)>.00005||curve>0?64:1;
@@ -663,6 +676,7 @@ void main(){color=texture(pixels,uv);}`);
       ctx.drawImage(this._roomCanvas,0,0,w,h);
     }
     ctx.restore();ctx.filter='none';ctx.globalAlpha=1;
+    if(ctx.canvas)this._inletCache=drawInletFallback(ctx,this._fallbackOutput||this.canvas,this._fallbackBuffer,o,power,this._inletCache);
     if(this._blitGL){
       const gl=this._blitGL;gl.bindVertexArray(null);gl.useProgram(this._blitProgram.p);
       gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,w,h);
