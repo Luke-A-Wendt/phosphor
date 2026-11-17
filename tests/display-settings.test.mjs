@@ -14,7 +14,7 @@ test('missing or invalid stored settings fall back to independent usable default
     assert.equal(result.environment,'diffuse');
   }
   const copy=normalizeSettings();copy.brightness=0;copy.environment='none';
-  assert.equal(normalizeSettings().brightness,1.75);
+  assert.equal(normalizeSettings().brightness,2);
   assert.equal(normalizeSettings().environment,'diffuse');
 });
 
@@ -73,10 +73,10 @@ test('sound defaults preserve calibrated volume and all sound values clamp indep
 });
 
 test('tint is bounded across the complete hue wheel and invalid values restore the original green',()=>{
- assert.equal(DISPLAY_DEFAULTS.tint,125);
+ assert.equal(DISPLAY_DEFAULTS.tint,190);
  assert.equal(normalizeSettings({tint:-50}).tint,0);
  assert.equal(normalizeSettings({tint:500}).tint,360);
- for(const invalid of [NaN,Infinity,-Infinity,'240',null])assert.equal(normalizeSettings({tint:invalid}).tint,125);
+ for(const invalid of [NaN,Infinity,-Infinity,'240',null])assert.equal(normalizeSettings({tint:invalid}).tint,190);
  assert.equal(normalizeSettings(JSON.parse(JSON.stringify({tint:240}))).tint,240);
  const green=phosphorColors(125);
  assert.deepEqual(green.spectrum,[.035,1,.115]);assert.deepEqual(green.glass,[.20,.72,.30]);assert.deepEqual(green.coating,[.10,.70,.24]);

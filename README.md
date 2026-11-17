@@ -47,7 +47,7 @@ Select **Settings** from the root menu. The controls are phosphor pixels rendere
 Use up/down to select a setting, left/right to adjust it, and Enter to activate it. The list scrolls as you move. **Display test** is available only from settings, at the top of the list. Enter cycles its grid/levels, beam/focus, and motion/decay patterns; Escape returns to settings.
 
 - **Controls** (browser only) opens a glowing keyboard diagram of WASD, arrows, E, Enter, numpad Enter, Space, Q, and Escape. Held movement/action keys light up; Escape or Q returns to Settings.
-- **Tint** selects the monochrome hue across the full color wheel. The default is the original green; glow, line/spot decay and glass tones follow the selected tint. Reset settings or exit to Home restores green.
+- **Tint** selects the monochrome hue across the full color wheel. The default is cyan at 190 degrees; glow, line/spot decay and glass tones follow the selected tint. Reset settings or exit to Home restores the default cyan.
 - **Ambient light** ranges from a dark room to an illuminated room, raising the textured phosphor surface's black level along with reflected light.
 - **Reflection** controls environmental glare independently. Environments are **Off**, **Soft room**, **Daylight**, **Desk light**, **Observer**, and **Mixed light**. The observer is a faint procedural silhouette; no camera is used.
 - Beam intensity, afterglow, light scatter, scanlines, curvature, glass depth, and stable display are adjustable. **Reset settings** restores defaults immediately.

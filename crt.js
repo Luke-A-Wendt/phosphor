@@ -15,9 +15,10 @@
  * 15.72 kHz sweeps. Fast/slow decay constants are illustrative green phosphor.
  */
 
+import {DISPLAY_DEFAULTS} from './display-settings.js';
 import {INLET} from './inlet-shader.js';
 import {drawInletFallback} from './inlet.js';
-import {DEFAULT_TINT,normalizeTint,phosphorColors,colorCSS} from './phosphor-color.js';
+import {normalizeTint,phosphorColors,colorCSS} from './phosphor-color.js';
 
 const VS = `#version 300 es
 precision highp float;
@@ -388,7 +389,7 @@ function program(gl,fragment){
 export class CRTDisplay {
   constructor(canvas,sourceCanvas){
     this.canvas=canvas; this.source=sourceCanvas;this.power={level:1,vertical:1,horizontal:1,spot:0};
-    this.options={monitorBorder:true,tint:DEFAULT_TINT,brightness:1.75,persistence:1,bloom:1.4,curvature:.75,glass:1.25,scanlines:1.6,ambient:1.5,reflection:1.45,environment:'diffuse',reducedMotion:false};
+    this.options={...DISPLAY_DEFAULTS};
     this._backend='Canvas 2D fallback'; this._targets=[]; this._programs=[]; this._destroyed=false;
     this._contextLost=false; this._lostHandler=e=>{e.preventDefault();this._contextLost=true;this._backend='WebGL context lost';};
     this._restoreHandler=()=>{this._contextLost=false;this.gl=this.gl||this._blitGL;this._blitGL=null;try{this._initGL();this.resize();}catch(e){this._fallback(e);}};

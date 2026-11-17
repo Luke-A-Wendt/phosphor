@@ -14,13 +14,13 @@ function harness(options=DISPLAY_DEFAULTS){
 }
 
 test('settings preserve short joystick taps and repeat held adjustments after a delay',()=>{
- const h=harness();h.screen.index=4;h.tap('ArrowRight');assert.equal(h.screen.options.ambient,1.55);
- h.input.set('stick',['ArrowRight']);h.frame();assert.equal(h.screen.options.ambient,1.6);
- for(let n=0;n<30;n++)h.frame();assert.equal(h.screen.options.ambient,1.6);
- for(let n=0;n<30;n++)h.frame();assert.ok(h.screen.options.ambient>1.6);
+ const h=harness();h.screen.index=4;h.tap('ArrowRight');assert.equal(h.screen.options.ambient,.85);
+ h.input.set('stick',['ArrowRight']);h.frame();assert.equal(h.screen.options.ambient,.9);
+ for(let n=0;n<30;n++)h.frame();assert.equal(h.screen.options.ambient,.9);
+ for(let n=0;n<30;n++)h.frame();assert.ok(h.screen.options.ambient>.9);
  h.input.clear();h.screen.release();h.frame();const value=h.screen.options.ambient;
  for(let n=0;n<60;n++)h.frame();assert.equal(h.screen.options.ambient,value);
- h.tap('ArrowDown');assert.equal(h.screen.index,5);h.tap('ArrowLeft');assert.equal(h.screen.options.reflection,1.4);
+ h.tap('ArrowDown');assert.equal(h.screen.index,5);h.tap('ArrowLeft');assert.equal(h.screen.options.reflection,1.1);
 });
 
 test('numeric bounds, opposite directions, and diagonal navigation are safe',()=>{
@@ -87,15 +87,15 @@ test('four sound sliders are independent, bounded to silence/full volume, and re
 });
 
 test('tint slider changes immediately through the hue wheel and reset restores green',()=>{
- const h=harness();h.screen.index=1;assert.equal(h.screen.selectionLabel,'TINT: 125 DEG');
- h.tap('ArrowRight');assert.equal(h.screen.options.tint,130);assert.equal(h.changes.at(-1).tint,130);
- h.tap('ArrowLeft');assert.equal(h.screen.options.tint,125);assert.equal(h.tests,0);
+ const h=harness();h.screen.index=1;assert.equal(h.screen.selectionLabel,'TINT: 190 DEG');
+ h.tap('ArrowRight');assert.equal(h.screen.options.tint,195);assert.equal(h.changes.at(-1).tint,195);
+ h.tap('ArrowLeft');assert.equal(h.screen.options.tint,190);assert.equal(h.tests,0);
  h.screen.setOptions({...h.screen.options,tint:0});h.tap('ArrowLeft');assert.equal(h.screen.options.tint,0);
  h.screen.setOptions({...h.screen.options,tint:355});h.tap('ArrowRight');assert.equal(h.screen.options.tint,360);
  h.tap('ArrowRight');assert.equal(h.screen.options.tint,360);
  h.tap('Space');assert.equal(h.tests,0,'tint action never opens the display test');
  h.screen.index=0;h.tap('Space');assert.equal(h.tests,1);
- h.screen.index=h.screen.rows.findIndex(row=>row.key==='reset');h.tap('Space');assert.equal(h.screen.options.tint,125);
+ h.screen.index=h.screen.rows.findIndex(row=>row.key==='reset');h.tap('Space');assert.equal(h.screen.options.tint,190);
 });
 
 test('sound labels, mobile visibility and display test order match the settings layout',()=>{

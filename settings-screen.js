@@ -5,7 +5,7 @@ import {DISPLAY_DEFAULTS,ENVIRONMENTS,normalizeSettings} from './display-setting
 const ENVIRONMENT_LABELS={none:'OFF',diffuse:'SOFT ROOM',window:'DAYLIGHT',studio:'DESK LIGHT',observer:'OBSERVER',mixed:'MIXED LIGHT'};
 const ROWS=[
  {key:'test',label:'DISPLAY TEST',note:'GRID / FOCUS / MOTION',type:'action'},
- {key:'tint',label:'TINT',note:'MONOCHROME HUE / GREEN 125 DEG',max:360,step:5},
+ {key:'tint',label:'TINT',note:'MONOCHROME HUE / DEFAULT 190 DEG',max:360,step:5},
  {key:'monitorBorder',label:'MONITOR BORDER',note:'REFLECTIVE INNER BEZEL',type:'boolean'},
  {key:'environment',label:'ENVIRONMENT',note:'SOFT LIGHT AROUND THE GLASS',type:'environment'},
  {key:'ambient',label:'AMBIENT LIGHT',note:'DARK ROOM < > LIT ROOM'},

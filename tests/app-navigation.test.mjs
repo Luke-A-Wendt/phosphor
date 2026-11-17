@@ -460,9 +460,9 @@ test('desktop and mobile tint changes survive child navigation and reset on exit
  for(const mobile of [false,true]){
  const h=harness({mobile});await h.launch();h.key('ArrowUp');h.key('Enter');assert.equal(h.mode(),'settings');
  h.key('ArrowDown');assert.match(h.run('settings.selectionLabel'),/^TINT:/);
- h.key('ArrowRight');assert.equal(h.run('options.tint'),130);
- await h.escape();assert.equal(h.mode(),'menu');assert.equal(h.run('options.tint'),130);
- await h.escape();assert.equal(h.mode(),'home');assert.equal(h.run('options.tint'),125);
+ h.key('ArrowRight');assert.equal(h.run('options.tint'),195);
+ await h.escape();assert.equal(h.mode(),'menu');assert.equal(h.run('options.tint'),195);
+ await h.escape();assert.equal(h.mode(),'home');assert.equal(h.run('options.tint'),190);
  }
 });
 
@@ -519,13 +519,13 @@ test('desktop key input is silent while mobile retains keyboard sounds and its s
 test('launcher uses the CRT renderer with green defaults on black and keeps it separate from game power',async()=>{
  const h=harness();await h.advance(.1);
  assert.equal(h.run('launchSource.width'),256);assert.equal(h.run('launchSource.height'),192);
- assert.equal(h.run('launchRenderer.options.tint'),125);
+ assert.equal(h.run('launchRenderer.options.tint'),190);
  assert.equal(h.run('launchRenderer.options.blackBackground'),true);
  assert.equal(h.run('launchRenderer.options.ambient'),0);
  assert.equal(h.run('launchRenderer.options.bloom'),normalizeSettings().bloom);
  await h.launch();assert.equal(h.run('launchRenderer===renderer'),false);
  await h.escape();assert.equal(h.mode(),'home');await h.advance(.1);
- assert.equal(h.run('launchRenderer.options.tint'),125);
+ assert.equal(h.run('launchRenderer.options.tint'),190);
 });
 
 
