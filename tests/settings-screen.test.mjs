@@ -162,3 +162,9 @@ test('controls action is browser-only, opens once and preserves settings values'
  screen.setMobile(true);assert.equal(screen.rows.some(row=>row.key==='controls'),false);
  screen.setMobile(false);assert.equal(screen.rows.filter(row=>row.key==='controls').length,1);
 });
+
+test('raster flicker can be disabled independently of stable display',()=>{
+ const h=harness();h.screen.index=h.screen.rows.findIndex(r=>r.key==='rasterFlicker');
+ h.tap('ArrowLeft');assert.equal(h.screen.options.rasterFlicker,false);assert.equal(h.screen.options.reducedMotion,false);
+ h.tap('Space');assert.equal(h.screen.options.rasterFlicker,true);
+});

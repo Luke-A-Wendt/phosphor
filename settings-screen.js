@@ -17,6 +17,7 @@ const ROWS=[
  {key:'curvature',label:'CURVATURE',max:2,note:'CURVED SCREEN GEOMETRY'},
  {key:'glass',label:'GLASS DEPTH',max:2,note:'GLASS THICKNESS AND REFRACTION'},
  {key:'reducedMotion',label:'STABLE DISPLAY',note:'REDUCES RASTER FLUCTUATION',type:'boolean'},
+ {key:'rasterFlicker',label:'RASTER FLICKER',note:'BRIEF SCAN BEAT / STABLE OVERRIDES',type:'boolean'},
  {key:'degauss',label:'DEGAUSS',note:'DEMAGNETIZE / ENTER TO ACTIVATE',type:'action'},
  {key:'controls',label:'CONTROLS',note:'KEYBOARD MAP / ALL KEY BINDINGS',type:'action',browserOnly:true},
  {key:'musicVolume',label:'MUSIC',note:'GAME MUSIC / ZERO MUTES',max:1},

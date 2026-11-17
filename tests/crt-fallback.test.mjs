@@ -88,17 +88,18 @@ test('every encoded pipeline pass receives the same buffer mode',()=>{
 });
 
 test('inlet receives the completed screen pass on both GPU paths and is bypassed by the launcher',()=>{
- for(const monitorBorder of [false,true])for(const blackBackground of [false,true])for(const bytes of [false,true]){
+ for(const reducedMotion of [false,true])for(const rasterFlicker of [false,true])for(const monitorBorder of [false,true])for(const blackBackground of [false,true])for(const bytes of [false,true]){
   const passes=[];let mipmaps=0;
   const gl={bindVertexArray(){},activeTexture(){},bindTexture(){},pixelStorei(){},texSubImage2D(){},texParameteri(){},generateMipmap(){mipmaps++;}};
   const target=name=>({name,texture:{name},width:800,height:600});
-  const renderer={gl,options:{tint:125,brightness:1.75,curvature:.75,glass:1.25,bloom:1.4,scanlines:1.6,ambient:1.5,reflection:1.45,environment:'diffuse',blackBackground,monitorBorder},
+  const renderer={gl,options:{tint:125,brightness:1.75,curvature:.75,glass:1.25,bloom:1.4,scanlines:1.6,ambient:1.5,reflection:1.45,environment:'diffuse',blackBackground,monitorBorder,rasterFlicker,reducedMotion},
    _byteTargets:bytes,source:{},power:{level:.4,horizontal:1,vertical:.05,spot:.1},states:[target('old'),target('new')],stateIndex:0,
    programs:Object.fromEntries(['state','beam','blur','composite','inlet'].map(name=>[name,name])),
    ...Object.fromEntries(['beamTarget','blurHalf','glowTarget','blurQuarter','scatterTarget','screenTarget'].map(name=>[name,target(name)])),
    _pass(program,output,textures,uniforms){passes.push({program,output,textures,uniforms});}};
   CRTDisplay.prototype.render.call(renderer,1,.016);
   assert.equal(mipmaps,(blackBackground||!monitorBorder)?0:1,'only screen emission needs mip prefiltering');
+  assert.equal(passes.find(p=>p.program==='state').uniforms.rasterFlicker,rasterFlicker&&!reducedMotion?1:0);
   const composite=passes.find(p=>p.program==='composite');
   assert.equal(composite.uniforms.powerLevel,.4);assert.equal(composite.uniforms.powerScale[1],.05);
   if(blackBackground||!monitorBorder){assert.equal(passes.at(-1),composite);assert.equal(composite.output,null);}

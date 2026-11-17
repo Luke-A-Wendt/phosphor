@@ -35,6 +35,8 @@ uniform sampler2D previousState;
 uniform float clock;
 uniform float exposure;
 uniform float persistence;
+uniform float rasterFlicker;
+uniform float flickerTime;
 uniform float bufferMode;
 vec2 packLight(float v){float scaled=clamp(v/32.0,0.0,1.0)*255.0;return vec2(floor(scaled)/255.0,fract(scaled));}
 out vec4 color;
@@ -56,6 +58,8 @@ void main(){
   float pulse=(floor((start-phase)/period)+1.0)*period+phase;
   vec2 integral=vec2(0.0);
   float cursor=start;
+  vec2 steadyEnergy=period/tau/(1.0-exp(-period/tau))*exp(-mod(start-phase,period)/tau);
+  vec2 steadyIntegral=vec2(0.0);
   // At most four visits with the capped 50 ms exposure. Emission is integrated
   // as energy*tau*(1-exp(-dt/tau)), including the fraction after each pulse.
   for(int i=0;i<4;i++){
@@ -63,6 +67,8 @@ void main(){
       float step=max(0.0,pulse-cursor);
       vec2 decay=exp(-step/tau);
       integral+=energy*tau*(1.0-decay);
+      steadyIntegral+=steadyEnergy*tau*(1.0-decay);
+      steadyEnergy=steadyEnergy*decay+period/tau;
       energy=energy*decay+excitation*period/tau;
       cursor=pulse; pulse+=period;
     }
@@ -70,8 +76,19 @@ void main(){
   vec2 decay=exp(-max(0.0,clock-cursor)/tau);
   integral+=energy*tau*(1.0-decay);
   energy*=decay;
+  steadyIntegral+=steadyEnergy*tau*(1.0-decay);
   float tail=0.20*clamp(persistence,0.0,1.5);
   float light=dot(integral/max(exposure,0.0001),vec2(1.0-tail,tail));
+  // Remove the stationary-source refresh beat without removing the stored
+  // phosphor history. The exact periodic solution predicts the exposure bias
+  // for this row, so a static image stays equally bright at any host refresh.
+  float steadyLight=dot(steadyIntegral/max(exposure,0.0001),vec2(1.0-tail,tail));
+  float corrected=max(0.0,light+excitation*(1.0-steadyLight));
+  // Optional residual scan beat lasts at most 120 ms, once every four seconds.
+  // Its dip is capped at 12%; it can never park a dark half-frame on screen.
+  float burst=mod(flickerTime,4.0);
+  float envelope=smoothstep(0.0,0.025,burst)*(1.0-smoothstep(0.085,0.12,burst));
+  light=corrected*(1.0-rasterFlicker*envelope*clamp(1.0-steadyLight,0.0,1.0)*0.12);
   color=bufferMode>0.5?vec4(log2(1.0+min(energy,vec2(255.0)))/8.0,packLight(light)):vec4(energy,light,1.0);
 }`;
 
@@ -501,6 +518,7 @@ void main(){color=texture(pixels,uv);}`);
     for(const key of ['brightness','persistence','bloom','curvature','glass','scanlines','ambient','reflection']){
       if(Number.isFinite(partial[key]))this.options[key]=Math.max(0,Math.min(2,partial[key]));
     }
+    if('rasterFlicker' in partial)this.options.rasterFlicker=Boolean(partial.rasterFlicker);
     if('monitorBorder' in partial)this.options.monitorBorder=Boolean(partial.monitorBorder);
     if('blackBackground' in partial)this.options.blackBackground=Boolean(partial.blackBackground);
     if('tint' in partial)this.options.tint=normalizeTint(partial.tint);
@@ -571,7 +589,7 @@ void main(){color=texture(pixels,uv);}`);
     // single-precision shader arithmetic after a tab has been open for hours.
     this._clock=(this._clock||0)+dt;
     if(this._clock>1)this._clock-=1; // exactly 60 raster periods; sub-microsecond float precision
-    this._pass(this.programs.state,current,{sourceImage:this.inputTexture,previousState:previous.texture},{clock:this._clock,exposure:dt,persistence:o.persistence});
+    this._pass(this.programs.state,current,{sourceImage:this.inputTexture,previousState:previous.texture},{clock:this._clock,exposure:dt,persistence:o.persistence,rasterFlicker:o.rasterFlicker&&!o.reducedMotion?1:0,flickerTime:Math.max(0,timeSeconds||0)%4});
     this.stateIndex=1-this.stateIndex;
     this._pass(this.programs.beam,this.beamTarget,{state:current.texture},{scanlines:o.scanlines,brightness:o.brightness});
     const w=this.beamTarget.width,h=this.beamTarget.height;
