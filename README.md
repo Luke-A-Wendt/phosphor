@@ -2,7 +2,7 @@
 
 Eight minimal arcade games behind curved green glass. **PHOSPHOR** draws its games, menus, settings, and calibration patterns into the same 256 × 192 monochrome raster.
 
-<img width="1441" height="1079" alt="image" src="https://github.com/user-attachments/assets/f9afccd4-5c64-415e-b8a2-425de6ca7cac" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/ef8c7fa9-219b-43dd-945e-54c00b6ac0f5" />
 
 ## Open and play
 
